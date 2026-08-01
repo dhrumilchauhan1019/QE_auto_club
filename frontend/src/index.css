@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* theme tokens - change these to re-skin the whole app */
+:root {
+  --bg: 14 22 32;
+  --panel: 22 33 46;
+  --panel-light: 30 44 59;
+  --border: 42 58 76;
+  --text: 199 207 216;
+  --text-muted: 138 151 166;
+  --accent: 201 123 74;
+  --accent-light: 224 165 120;
+  --tier-a: 74 222 128;
+  --tier-b: 251 191 36;
+  --tier-c: 148 163 184;
+  --danger: 248 113 113;
+  --radius: 10px;
+}
+
+body { font-family: 'Inter', sans-serif; background: rgb(var(--bg)); color: rgb(var(--text)); }
+h1, h2, h3, .font-display { font-family: 'Space Grotesk', sans-serif; }
+.font-mono-data { font-family: 'JetBrains Mono', monospace; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgb(var(--bg)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--border)); border-radius: 4px; }
+
+/* plain-CSS component classes, not Tailwind - easier to retheme in one place */
+.panel {
+  background: rgb(var(--panel));
+  border: 1px solid rgb(var(--border));
+  border-radius: var(--radius);
+}
+.copper-rail { background: linear-gradient(90deg, rgb(var(--accent)), rgb(var(--accent-light))); }
+.btn-solid {
+  background: rgb(var(--accent));
+  color: rgb(var(--bg));
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+.btn-solid:hover { background: rgb(var(--accent-light)); }
+.tag-tier-a { color: rgb(var(--tier-a)); border: 1px solid rgb(var(--tier-a) / 0.3); background: rgb(var(--tier-a) / 0.1); }
+.tag-tier-b { color: rgb(var(--tier-b)); border: 1px solid rgb(var(--tier-b) / 0.3); background: rgb(var(--tier-b) / 0.1); }
+.tag-tier-c { color: rgb(var(--tier-c)); border: 1px solid rgb(var(--tier-c) / 0.3); background: rgb(var(--tier-c) / 0.1); }
+
+.kanban-col { min-width: 260px; }
+.kanban-card { cursor: grab; }
+.kanban-card.dragging { opacity: 0.4; }
+.kanban-col.drag-over { outline: 1px dashed rgb(var(--accent)); outline-offset: -4px; }
