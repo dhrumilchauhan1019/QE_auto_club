@@ -2,6 +2,9 @@
   "name": "qeautoclub-backend",
   "version": "1.0.0",
   "type": "commonjs",
+  "engines": {
+    "node": "22.x"
+  },
   "prisma": {
     "seed": "node prisma/seed.js"
   },
