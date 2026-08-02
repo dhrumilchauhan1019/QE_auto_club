@@ -11,7 +11,7 @@ const ROLES = [
   { key: 'manager', label: 'Sales Manager', icon: '◐', email: 'manager@qeautoclub.demo', password: 'Manager123!' },
   { key: 'closer', label: 'Closer', icon: '◑', email: 'closer@qeautoclub.demo', password: 'Closer123!' },
   { key: 'finance', label: 'Finance', icon: '$', email: 'finance@qeautoclub.demo', password: 'Finance123!' },
-  { key: 'caller', label: 'Caller', icon: '☎', email: 'caller@qeautoclub.demo', password: 'Caller123!' }
+  { key: 'caller', label: 'Caller', icon: '☎', email: 'chisom@qeautoclub.demo', password: 'Chisom123!' }
 ];
 
 export default function Login() {
