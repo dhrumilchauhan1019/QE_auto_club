@@ -19,7 +19,7 @@ function scopeWhere(req, where = {}) {
       { assignedCloserId: null, status: { in: CLOSER_VISIBLE_STAGES } }
     ];
   }
-  if (!where.archived) where.archived = false;
+  // if (!where.archived) where.archived = false;
   return where;
 }
 
@@ -39,9 +39,19 @@ function applyOr(where, orConditions) {
 }
 
 async function list(req, res) {
-  const { search, tier, status, caller, sort = 'createdAt', order = 'desc', page = 1, pageSize = 25 } = req.query;
+  const { search, tier, status, archived, caller, sort = 'createdAt', order = 'desc', page = 1, pageSize = 25 } = req.query;
 
   const where = scopeWhere(req);
+
+  // All / Active / Archived filter
+  if (archived === "true") {
+    where.archived = true;
+  } else if (archived === "false") {
+    where.archived = false;
+  } else {
+    delete where.archived; // All (default)
+  }
+
   const searchOr = search ? [
     { businessName: { contains: search, mode: 'insensitive' } },
     { decisionMaker: { contains: search, mode: 'insensitive' } },
