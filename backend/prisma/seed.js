@@ -47,7 +47,8 @@ async function main() {
   const chisom = await upsertUser('Chisom', 'chisom@qeautoclub.demo', 'Chisom123!', 'caller');
 
   const count = await prisma.prospect.count();
-  if (count === 0) {
+  const seedDemoProspects = process.env.SEED_DEMO_PROSPECTS === 'true';
+  if (count === 0 && seedDemoProspects) {
     for (let i = 0; i < 40; i++) {
       const data = randomProspect(i);
       const { score, tier, reason } = calculateScore(data);
@@ -68,6 +69,8 @@ async function main() {
       }
     }
     console.log('Seeded 40 sample prospects (10 assigned to Chisom).');
+  } else if (count === 0) {
+    console.log('No prospects in database. Demo seeding is off (SEED_DEMO_PROSPECTS is not "true") - waiting for a real CSV import.');
   } else {
     console.log('Prospects already exist, skipping.');
   }
