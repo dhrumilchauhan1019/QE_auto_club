@@ -5,7 +5,7 @@ const { requireRole } = require('../middlewares/role.middleware');
 
 router.use(requireAuth);
 router.get('/performance', requireRole('admin', 'manager'), ctrl.callerPerformance);
-router.get('/', requireRole('admin'), ctrl.list);
+router.get('/', requireRole('admin', 'manager'), ctrl.list);
 router.post('/', requireRole('admin'), ctrl.create);
 router.put('/:id', requireRole('admin'), ctrl.update);
 

@@ -9,14 +9,13 @@
     "seed": "node prisma/seed.js"
   },
   "scripts": {
-    "predev": "prisma generate && prisma db push --accept-data-loss && node prisma/seed.js",
-    "postinstall": "prisma generate",
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
-    "db:push": "prisma generate && prisma db push",
-    "db:seed": "node prisma/seed.js",
-    "db:clear-demo": "node prisma/clear-demo-data.js"
-  },
+  "predev": "prisma generate",
+  "dev": "nodemon src/server.js",
+  "start": "node src/server.js",
+  "db:push": "prisma generate && prisma db push",
+  "db:seed": "node prisma/seed.js",
+  "db:clear-demo": "node prisma/clear-demo-data.js"
+},
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",

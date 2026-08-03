@@ -17,7 +17,7 @@ const ROLES = [
   { value: 'admin', label: 'Admin' }
 ];
 const EMPTY_CREATE = { name: '', email: '', password: '', role: 'caller' };
-const EMPTY_EDIT = { name: '', role: 'caller', phone: '', password: '' };
+const EMPTY_EDIT = { name: '', email: '', role: 'caller', phone: '', password: '' };
 
 export default function Users() {
   const [items, setItems] = useState(null);
@@ -40,14 +40,26 @@ export default function Users() {
     load();
   }
 
-  function openEdit(u) {
-    setEditId(u.id);
-    setEditForm({ name: u.name, role: u.role, phone: u.phone || '', password: '' });
+  function openEdit(user) {
+    setEditId(user.id);
+
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      role: user.role || 'caller',
+      password: ''
+    });
   }
 
   async function saveEdit(e) {
     e.preventDefault();
-    const payload = { name: editForm.name, role: editForm.role, phone: editForm.phone };
+    const payload = {
+      name: editForm.name,
+      email: editForm.email,
+      phone: editForm.phone,
+      role: editForm.role
+    };
     if (editForm.password) payload.password = editForm.password;
     await api.put(`/users/${editId}`, payload);
     setEditId(null);
@@ -79,7 +91,7 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="font-display text-2xl text-mist">User Management</h1>
         <Button onClick={() => setOpen(true)}>+ Add User</Button>
       </div>
@@ -98,9 +110,10 @@ export default function Users() {
       <Modal open={!!editId} onClose={() => setEditId(null)} title="Edit User">
         <form onSubmit={saveEdit} className="space-y-3">
           <Input label="Name" required value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+          <Input label="Email" type="email" value={editForm.email} disabled />
           <Input label="Phone" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
           <Select label="Role" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} options={ROLES} />
-          <Input label="New password (leave blank to keep current)" type="password" value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
+          <Input label="New password (leave blank to keep current)" type="text" value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
           <Button type="submit" className="w-full">Save Changes</Button>
         </form>
       </Modal>

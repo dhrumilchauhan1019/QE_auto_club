@@ -59,7 +59,7 @@ export default function ProspectDetail() {
     <div className="space-y-6">
       <button onClick={() => navigate('/prospects')} className="text-slate text-sm hover:text-mist">&larr; Back to prospects</button>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl text-mist">{prospect.businessName}</h1>
           <div className="flex items-center gap-2 mt-2">
@@ -68,14 +68,14 @@ export default function ProspectDetail() {
             <span className="text-slate text-xs font-mono-data">Score {prospect.score}/100</span>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canArchive && <Button variant="danger" onClick={archiveProspect}>Archive</Button>}
           <Button variant="secondary" onClick={() => setMeetingOpen(true)}>Schedule Meeting</Button>
           <Button onClick={() => navigate(`/proposal-builder?prospectId=${prospect.id}`)}>Build Proposal</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Contact" className="col-span-1">
           <dl className="text-sm space-y-2">
             <Row label="Decision maker" value={prospect.decisionMaker} />
@@ -133,7 +133,7 @@ export default function ProspectDetail() {
         )}
       </Card>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card title="Open follow-ups">
           {prospect.followups.filter(f => !f.completed).length === 0 ? <p className="text-slate text-sm">None open.</p> : (
             <ul className="space-y-2 text-sm">

@@ -70,7 +70,7 @@ export default function Followups() {
       </div>
 
       {widgets && (
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           {[['Due Today', widgets.dueToday], ['Overdue', widgets.overdue], ['Upcoming Meetings', widgets.upcomingMeetings], ['Pending Proposal', widgets.pendingProposals], ['Pending Contract', widgets.pendingContracts], ['Pending Payment', widgets.pendingPayments]].map(([l, v]) => (
             <Card key={l}><div className="font-mono-data text-xl text-mist">{v}</div><div className="text-slate text-xs mt-1">{l}</div></Card>
           ))}
@@ -91,7 +91,7 @@ export default function Followups() {
           {needsNext ? (
             <>
               <p className="text-xs text-slate">This opportunity is still active — set the next follow-up before you can complete this one.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input label="Next follow-up date (required)" type="date" required value={nextDueDate} onChange={e => setNextDueDate(e.target.value)} />
                 <Input label="Next action note" value={nextNotes} onChange={e => setNextNotes(e.target.value)} />
               </div>

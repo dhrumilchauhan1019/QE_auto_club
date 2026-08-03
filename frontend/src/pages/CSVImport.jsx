@@ -78,7 +78,7 @@ export default function CSVImport() {
       {preview && !result && (
         <>
           <Card title={`Column mapping (${preview.rowCount} rows detected)`}>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {preview.headers.map(h => (
                 <div key={h} className="flex items-center gap-3">
                   <span className="text-mist text-sm w-32 truncate" title={h}>{h}</span>
@@ -117,7 +117,7 @@ export default function CSVImport() {
 
       {result && (
         <Card title="Import summary">
-          <div className="grid grid-cols-3 gap-4 mb-5 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5 text-center">
             <div className="bg-ink rounded-lg py-4"><div className="text-tierA font-mono-data text-2xl">{result.success}</div><div className="text-slate text-xs mt-1">Imported</div></div>
             <div className="bg-ink rounded-lg py-4"><div className="text-tierB font-mono-data text-2xl">{result.duplicates}</div><div className="text-slate text-xs mt-1">Duplicates skipped</div></div>
             <div className="bg-ink rounded-lg py-4"><div className="text-red-400 font-mono-data text-2xl">{result.failed}</div><div className="text-slate text-xs mt-1">Failed validation</div></div>

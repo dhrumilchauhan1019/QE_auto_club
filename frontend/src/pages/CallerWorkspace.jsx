@@ -81,8 +81,8 @@ export default function CallerWorkspace() {
         <p className="text-slate text-sm mt-1">{queue.length} prospect{queue.length === 1 ? '' : 's'} in your queue — pick anyone, or work top to bottom</p>
       </div>
 
-      <div className="flex gap-6 items-start">
-        <Card title="Queue" className="w-72 shrink-0 max-h-[70vh] overflow-y-auto">
+      <div className="flex flex-col md:flex-row gap-6 items-start">
+        <Card title="Queue" className="w-full md:w-72 shrink-0 max-h-64 md:max-h-[70vh] overflow-y-auto">
           {queue.length === 0 ? <p className="text-slate text-sm">Queue is empty.</p> : (
             <ul className="space-y-1">
               {queue.map(p => (
@@ -109,7 +109,7 @@ export default function CallerWorkspace() {
           {loading ? <Loader label="Loading prospect..." /> : !current ? (
             <Card><p className="text-slate text-sm">{message || 'No prospects currently in the queue. Nice work.'}</p></Card>
           ) : (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <Card title="Account context">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="font-display text-lg text-mist">{current.businessName}</h2>
@@ -135,7 +135,7 @@ export default function CallerWorkspace() {
                     Decision-maker was reached
                   </label>
                   <Input label={needsNotes ? 'Notes — reason required for this outcome' : 'Notes'} value={notes} onChange={e => setNotes(e.target.value)} />
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input label={needsDate ? 'Next action date — required' : 'Next action date'} type="date" value={nextActionDate} onChange={e => setNextActionDate(e.target.value)} />
                     <Input label="Next action note" value={nextActionNote} onChange={e => setNextActionNote(e.target.value)} />
                   </div>

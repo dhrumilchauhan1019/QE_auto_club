@@ -46,7 +46,7 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card title="Prospects"><div className="font-mono-data text-3xl text-mist">{prospects.total}</div></Card>
         <Card title="Tier A / B / C">
           <div className="flex gap-4 font-mono-data text-lg">
@@ -62,7 +62,7 @@ export default function Dashboard() {
       </div>
 
       <Card title="Funnel">
-        <div className="grid grid-cols-4 gap-3 text-center text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
           {[['Appointments', funnel.appointments], ['Presentations', funnel.presentations], ['Proposals Sent', funnel.proposalsSent], ['Contracts Signed', funnel.contractsSigned]].map(([label, value]) => (
             <div key={label} className="bg-ink rounded-lg py-4">
               <div className="font-mono-data text-xl text-mist">{value}</div>
@@ -72,7 +72,7 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[['Due Today', widgets.dueToday], ['Overdue', widgets.overdue], ['Upcoming Meetings', widgets.upcomingMeetings], ['Pending Proposals', widgets.pendingProposals], ['Pending Contracts', widgets.pendingContracts], ['Pending Payments', widgets.pendingPayments]].map(([label, value]) => (
           <Card key={label}><div className="font-mono-data text-2xl text-mist">{value}</div><div className="text-slate text-xs mt-1">{label}</div></Card>
         ))}

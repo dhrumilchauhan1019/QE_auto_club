@@ -27,11 +27,36 @@ export default function Prospects() {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
 
+  const [callers, setCallers] = useState([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [selectedProspect, setSelectedProspect] = useState(null);
+  const [selectedCaller, setSelectedCaller] = useState('');
+
+  // async function load() {
+  //   setLoading(true);
+  //   const { data } = await api.get('/prospects', { params: { search, tier, status, pageSize: 100 } });
+  //   setItems(data.items);
+  //   setTotal(data.total);
+  //   setLoading(false);
+  // }
+
   async function load() {
     setLoading(true);
-    const { data } = await api.get('/prospects', { params: { search, tier, status, pageSize: 100 } });
-    setItems(data.items);
-    setTotal(data.total);
+
+    const { data: prospects } = await api.get('/prospects', {
+      params: { search, tier, status, pageSize: 100 }
+    });
+
+    setItems(prospects.items);
+    setTotal(prospects.total);
+
+    // Only Admin/Manager needs the caller list
+    if (user.role === 'admin' || user.role === 'manager') {
+      const { data: users } = await api.get('/users');
+
+      setCallers(users.filter(u => u.role === 'caller'));
+    }
+
     setLoading(false);
   }
   useEffect(() => { load(); }, [search, tier, status]);
@@ -66,6 +91,24 @@ export default function Prospects() {
     load();
   }
 
+  function openAssign(row) {
+    setSelectedProspect(row);
+
+    setSelectedCaller(row.assignedCaller?.id || '');
+
+    setAssignOpen(true);
+  }
+
+  async function handleAssign() {
+    await api.put(`/prospects/${selectedProspect.id}`, {
+      assignedCallerId: selectedCaller
+    });
+
+    setAssignOpen(false);
+
+    load();
+  }
+
   async function exportCsv() {
     const res = await api.get('/prospects/export', { responseType: 'blob' });
     const url = URL.createObjectURL(new Blob([res.data]));
@@ -75,6 +118,7 @@ export default function Prospects() {
 
   const canEdit = user.role === 'admin' || user.role === 'manager';
   const canDelete = user.role === 'admin';
+  const canAssign = user.role === 'admin' || user.role === 'manager';
 
   const columns = [
     { key: 'businessName', label: 'Business', render: r => <span className="font-medium">{r.businessName}</span> },
@@ -86,11 +130,16 @@ export default function Prospects() {
     { key: 'nextAction', label: 'Next Action', render: r => <span className="text-slate">{r.nextAction || '—'}</span> }
   ];
 
-  if (canEdit || canDelete) {
+  if (canEdit || canDelete || canAssign) {
     columns.push({
       key: 'actions', label: '',
       render: r => (
         <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+          {canAssign && (
+            <Button size="sm" onClick={() => openAssign(r)}>
+              Assign
+            </Button>
+          )}
           {canEdit && <button onClick={() => openEdit(r)} className="text-xs text-slate hover:text-copper">Edit</button>}
           {canDelete && <button onClick={() => handleDelete(r)} className="text-xs text-slate hover:text-red-400">Delete</button>}
         </div>
@@ -100,7 +149,7 @@ export default function Prospects() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl text-mist">Prospects</h1>
           <p className="text-slate text-sm mt-1">{total} total records</p>
@@ -112,7 +161,7 @@ export default function Prospects() {
       </div>
 
       <Card>
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
           <Input placeholder="Search business, contact, phone, email..." value={search} onChange={e => setSearch(e.target.value)} />
           <Select value={tier} onChange={e => setTier(e.target.value)} options={[{ value: '', label: 'All tiers' }, { value: 'A', label: 'Tier A' }, { value: 'B', label: 'Tier B' }, { value: 'C', label: 'Tier C' }]} />
           <Select value={status} onChange={e => setStatus(e.target.value)} options={STAGES.map(s => ({ value: s, label: s ? s.replace(/_/g, ' ') : 'All statuses' }))} />
@@ -124,19 +173,19 @@ export default function Prospects() {
         <form onSubmit={handleCreate} className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           <Input label="Business name" required value={form.businessName} onChange={e => setForm({ ...form, businessName: e.target.value })} />
           <Input label="Industry" value={form.industry} onChange={e => setForm({ ...form, industry: e.target.value })} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Decision maker" value={form.decisionMaker} onChange={e => setForm({ ...form, decisionMaker: e.target.value })} />
             <Input label="Position" value={form.decisionMakerPosition} onChange={e => setForm({ ...form, decisionMakerPosition: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
             <Input label="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Vehicle count" type="number" value={form.vehicleCount} onChange={e => setForm({ ...form, vehicleCount: e.target.value })} />
             <Input label="Location" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input label="City" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
             <Input label="State" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
             <Input label="ZIP" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} />
@@ -149,25 +198,53 @@ export default function Prospects() {
         <form onSubmit={handleEditSave} className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           <Input label="Business name" required value={editForm.businessName} onChange={e => setEditForm({ ...editForm, businessName: e.target.value })} />
           <Input label="Industry" value={editForm.industry} onChange={e => setEditForm({ ...editForm, industry: e.target.value })} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Decision maker" value={editForm.decisionMaker} onChange={e => setEditForm({ ...editForm, decisionMaker: e.target.value })} />
             <Input label="Position" value={editForm.decisionMakerPosition} onChange={e => setEditForm({ ...editForm, decisionMakerPosition: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Phone" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
             <Input label="Email" type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Vehicle count" type="number" value={editForm.vehicleCount} onChange={e => setEditForm({ ...editForm, vehicleCount: e.target.value })} />
             <Input label="Location" value={editForm.location} onChange={e => setEditForm({ ...editForm, location: e.target.value })} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input label="City" value={editForm.city} onChange={e => setEditForm({ ...editForm, city: e.target.value })} />
             <Input label="State" value={editForm.state} onChange={e => setEditForm({ ...editForm, state: e.target.value })} />
             <Input label="ZIP" value={editForm.zip} onChange={e => setEditForm({ ...editForm, zip: e.target.value })} />
           </div>
           <Button type="submit" className="w-full mt-2">Save Changes</Button>
         </form>
+      </Modal>
+
+      <Modal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        title="Assign Caller"
+      >
+
+        <Select
+          value={selectedCaller}
+          onChange={e => setSelectedCaller(e.target.value)}
+          options={[
+            { value: '', label: 'Select Caller' },
+
+            ...callers.map(c => ({
+              value: c.id,
+              label: c.name
+            }))
+          ]}
+        />
+
+        <Button
+          className="mt-4 w-full"
+          onClick={handleAssign}
+        >
+          Assign
+        </Button>
+
       </Modal>
     </div>
   );

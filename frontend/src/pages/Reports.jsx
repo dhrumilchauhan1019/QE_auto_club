@@ -19,9 +19,9 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="font-display text-2xl text-mist">Reports</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-1">
             {['daily', 'weekly', 'monthly'].map(p => (
               <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-lg text-xs capitalize ${period === p ? 'bg-copper/10 text-copper border border-copper/30' : 'text-slate hover:text-mist'}`}>{p}</button>
@@ -33,18 +33,18 @@ export default function Reports() {
 
       <Card title="What happened today?"><p className="text-sm text-mist">{data.summary.whatHappened}</p></Card>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[['Calls', data.calls], ['DMs Reached', data.decisionMakersReached], ['Proposals Sent', data.proposalsSent], ['Contracts Signed', data.contractsSigned]].map(([label, value]) => (
           <Card key={label}><div className="font-mono-data text-2xl text-mist">{value}</div><div className="text-slate text-xs mt-1">{label}</div></Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card title="Revenue"><p className="text-sm text-mist">Contracted ${data.revenueContracted.toLocaleString()} · Collected ${data.revenueCollected.toLocaleString()}</p></Card>
         <Card title="Follow-up completion"><p className="text-sm text-mist">{data.followupsCompleted}/{data.followupsDue} completed today</p></Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <BreakdownCard title="Conversion by caller" data={data.conversionByCaller} />
         <BreakdownCard title="Conversion by industry" data={data.conversionByIndustry} />
         <BreakdownCard title="Conversion by tier" data={data.conversionByTier} />
