@@ -23,41 +23,47 @@ async function list(req, res) {
   res.json(followups);
 }
 
-// "Marking a follow-up complete should require the user to record what happened and
-// establish the next step when the opportunity is still active" - enforced here.
+// Mark Done is now a single lightweight action - no mandatory result notes, no forced
+// next-action date. That friction moved to the separate "Follow-up" button/modal instead,
+// which lets the user explicitly add a new follow-up or edit this one.
 async function complete(req, res) {
-  const { resultNotes, nextDueDate, nextNotes } = req.body;
-  if (!resultNotes || !resultNotes.trim()) {
-    return res.status(400).json({ error: 'You must record what happened before completing a follow-up.' });
-  }
-
-  const followup = await prisma.followup.findUnique({ where: { id: req.params.id }, include: { prospect: true } });
+  const followup = await prisma.followup.findUnique({ where: { id: req.params.id } });
   if (!followup) return res.status(404).json({ error: 'Follow-up not found' });
 
-  const stillActive = !['completed', 'closed_lost', 'do_not_contact'].includes(followup.prospect.status);
-  if (stillActive && !nextDueDate) {
-    return res.status(400).json({ error: 'This opportunity is still active - you must set the next follow-up date before completing this one.' });
-  }
+  const updated = await prisma.followup.update({ where: { id: req.params.id }, data: { completed: true } });
+  await prisma.prospect.update({ where: { id: followup.prospectId }, data: { lastActivityAt: new Date() } });
 
-  const updated = await prisma.followup.update({
-    where: { id: req.params.id },
-    data: { completed: true, notes: `${followup.notes || ''}${followup.notes ? ' | ' : ''}Result: ${resultNotes}` }
-  });
-
-  if (nextDueDate) {
-    await prisma.followup.create({ data: { prospectId: followup.prospectId, dueDate: new Date(nextDueDate), type: followup.type, notes: nextNotes || null } });
-  }
-  await prisma.prospect.update({ where: { id: followup.prospectId }, data: { lastActivityAt: new Date(), nextAction: nextNotes || undefined } });
-
-  log(req.user.id, 'followup_completed', 'prospect', followup.prospectId, resultNotes);
+  log(req.user.id, 'followup_completed', 'prospect', followup.prospectId, followup.notes || null);
   res.json(updated);
 }
 
+// "Add New Follow-up" - a separate additional record, independent of any existing one
 async function create(req, res) {
   const { prospectId, dueDate, type, notes } = req.body;
   if (!prospectId || !dueDate) return res.status(400).json({ error: 'prospectId and dueDate are required' });
   const followup = await prisma.followup.create({ data: { prospectId, dueDate: new Date(dueDate), type, notes } });
+  await prisma.prospect.update({ where: { id: prospectId }, data: { lastActivityAt: new Date(), nextAction: notes || undefined } });
   res.status(201).json(followup);
+}
+
+// "Change Existing Follow-up" - edits this row's own date/type/notes in place
+async function update(req, res) {
+  const { dueDate, type, notes } = req.body;
+  const existing = await prisma.followup.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Follow-up not found' });
+
+  const data = {};
+  if (dueDate) data.dueDate = new Date(dueDate);
+  if (type !== undefined) data.type = type;
+  if (notes !== undefined) data.notes = notes;
+
+  const updated = await prisma.followup.update({ where: { id: req.params.id }, data });
+
+  const prevDate = existing.dueDate.toISOString().slice(0, 10);
+  const newDate = updated.dueDate.toISOString().slice(0, 10);
+  log(req.user.id, 'followup_changed', 'prospect', existing.prospectId, null, prevDate, newDate);
+
+  res.json(updated);
 }
 
 async function widgets(req, res) {
@@ -77,4 +83,4 @@ async function widgets(req, res) {
   res.json({ dueToday, overdue, upcomingMeetings, pendingProposals, pendingContracts, pendingPayments });
 }
 
-module.exports = { list, complete, create, widgets };
+module.exports = { list, complete, create, update, widgets };

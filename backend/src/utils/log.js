@@ -1,9 +1,13 @@
 const prisma = require('../config/database');
 
-// audit trail entry, silently ignores failures so logging never breaks a request
-async function log(userId, action, entityType, entityId, details) {
+// audit trail entry, silently ignores failures so logging never breaks a request.
+// previousValue/newValue are optional - existing call sites that only pass details
+// still work exactly as before, this just adds a real diff when callers provide one.
+async function log(userId, action, entityType, entityId, details, previousValue, newValue) {
   try {
-    await prisma.activityLog.create({ data: { userId, action, entityType, entityId, details } });
+    await prisma.activityLog.create({
+      data: { userId, action, entityType, entityId, details, previousValue: previousValue ?? null, newValue: newValue ?? null }
+    });
   } catch (e) { /* non-critical */ }
 }
 

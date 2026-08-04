@@ -6,11 +6,24 @@ import Table from '../components/common/Table.jsx';
 import Button from '../components/common/Button.jsx';
 import { Loader } from '../components/common/Loader.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import StatusModal from '../components/common/StatusModal.jsx';
 
 export default function Contracts() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState(null);
+
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusType, setStatusType] = useState('success');
+  const [statusTitle, setStatusTitle] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  function showStatus(t, title, message) {
+    setStatusType(t);
+    setStatusTitle(title);
+    setStatusMessage(message);
+    setStatusOpen(true);
+  }
 
   async function load() {
     const { data } = await api.get('/contracts');
@@ -19,8 +32,13 @@ export default function Contracts() {
   useEffect(() => { load(); }, []);
 
   async function sign(id) {
-    await api.patch(`/contracts/${id}/sign`, {});
-    load();
+    try {
+      await api.patch(`/contracts/${id}/sign`, {});
+      showStatus('success', 'Contract Signed', 'The contract has been marked as signed.');
+      load();
+    } catch (err) {
+      showStatus('error', 'Could Not Sign', err.response?.data?.error || 'Unable to mark this contract signed.');
+    }
   }
 
   if (!items) return <Loader label="Loading contracts..." />;
@@ -39,6 +57,15 @@ export default function Contracts() {
     <div className="space-y-6">
       <h1 className="font-display text-2xl text-mist">Contracts</h1>
       <Card><Table columns={columns} rows={items} emptyMessage="No contracts yet." /></Card>
+
+      <StatusModal
+        open={statusOpen}
+        type={statusType}
+        title={statusTitle}
+        message={statusMessage}
+        buttonText="OK"
+        onClose={() => setStatusOpen(false)}
+      />
     </div>
   );
 }

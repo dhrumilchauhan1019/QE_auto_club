@@ -9,6 +9,7 @@ import Select from '../components/common/Select.jsx';
 import Modal from '../components/common/Modal.jsx';
 import { Loader } from '../components/common/Loader.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import StatusModal from '../components/common/StatusModal.jsx';
 
 export default function Payments() {
   const { user } = useAuth();
@@ -17,6 +18,18 @@ export default function Payments() {
   const [contracts, setContracts] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ contractId: '', amount: '' });
+
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusType, setStatusType] = useState('success');
+  const [statusTitle, setStatusTitle] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  function showStatus(t, title, message) {
+    setStatusType(t);
+    setStatusTitle(title);
+    setStatusMessage(message);
+    setStatusOpen(true);
+  }
 
   async function load() {
     const [{ data }, { data: c }] = await Promise.all([api.get('/payments'), api.get('/contracts')]);
@@ -28,10 +41,15 @@ export default function Payments() {
   async function submit(e) {
     e.preventDefault();
     const contract = contracts.find(c => c.id === form.contractId);
-    await api.post('/payments', { prospectId: contract.prospectId, contractId: form.contractId, amount: Number(form.amount) });
-    setOpen(false);
-    setForm({ contractId: '', amount: '' });
-    load();
+    try {
+      await api.post('/payments', { prospectId: contract.prospectId, contractId: form.contractId, amount: Number(form.amount) });
+      setOpen(false);
+      setForm({ contractId: '', amount: '' });
+      showStatus('success', 'Payment Recorded', 'The payment has been recorded successfully.');
+      load();
+    } catch (err) {
+      showStatus('error', 'Could Not Record Payment', err.response?.data?.error || 'Unable to record this payment.');
+    }
   }
 
   if (!items) return <Loader label="Loading payments..." />;
@@ -63,6 +81,15 @@ export default function Payments() {
           <Button type="submit" className="w-full">Record</Button>
         </form>
       </Modal>
+
+      <StatusModal
+        open={statusOpen}
+        type={statusType}
+        title={statusTitle}
+        message={statusMessage}
+        buttonText="OK"
+        onClose={() => setStatusOpen(false)}
+      />
     </div>
   );
 }

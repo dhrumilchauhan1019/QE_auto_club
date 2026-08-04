@@ -73,6 +73,8 @@ async function logCall(req, res) {
     return res.status(400).json({ error: `"${outcome.replace(/_/g, ' ')}" requires a reason in the notes field.` });
   }
 
+  const existingProspect = await prisma.prospect.findUnique({ where: { id: prospectId }, select: { status: true } });
+
   const activity = await prisma.activity.create({
     data: { prospectId, callerId, outcome, decisionMakerReached: !!decisionMakerReached, notes }
   });
@@ -117,7 +119,8 @@ async function logCall(req, res) {
     await prisma.meeting.create({ data: { prospectId, scheduledAt: new Date(nextActionDate), type: 'presentation', notes: nextActionNote } });
   }
 
-  log(callerId, 'call_logged', 'prospect', prospectId, outcome);
+  const newStage = stageMap[outcome];
+  log(callerId, 'call_logged', 'prospect', prospectId, outcome, newStage ? existingProspect?.status : null, newStage || null);
   res.status(201).json(activity);
 }
 

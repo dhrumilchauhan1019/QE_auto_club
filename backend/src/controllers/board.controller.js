@@ -21,8 +21,9 @@ async function moveCard(req, res) {
   if (!STAGES.includes(status) && status !== 'closed_lost' && status !== 'do_not_contact') {
     return res.status(400).json({ error: 'Invalid stage' });
   }
+  const existing = await prisma.prospect.findUnique({ where: { id: req.params.id }, select: { status: true } });
   const prospect = await prisma.prospect.update({ where: { id: req.params.id }, data: { status, lastActivityAt: new Date() } });
-  log(req.user.id, 'stage_changed', 'prospect', prospect.id, status);
+  log(req.user.id, 'stage_changed', 'prospect', prospect.id, null, existing?.status, status);
   res.json(prospect);
 }
 

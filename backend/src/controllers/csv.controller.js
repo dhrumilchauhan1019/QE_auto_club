@@ -8,7 +8,7 @@ const REQUIRED_FIELDS = ['businessName'];
 const KNOWN_FIELDS = [
   'businessName', 'industry', 'website', 'decisionMaker', 'decisionMakerPosition', 'phone', 'email',
   'vehicleCount', 'location', 'city', 'county', 'currentArrangement', 'leadSource', 'tier', 'score',
-  'status', 'nextAction', 'notes', 'assignedCaller'
+  'status', 'nextAction', 'notes', 'assignedCaller', 'qualificationEvidence', 'verificationStatus'
 ];
 
 const STATUS_ALIASES = {
@@ -26,8 +26,10 @@ const STATUS_ALIASES = {
 };
 
 // columns that fold into the free-text notes field rather than their own DB column,
-// so the research already in the master sheet isn't thrown away
-const NOTES_SOURCE_HEADERS = ['fleet evidence', 'operating indicator', 'outreach angle', 'source url', 'verification status', 'linkedin', 'research date'];
+// so the research already in the master sheet isn't thrown away. Only used as a
+// suggestion fallback for headers that have no dedicated Prospect field at all -
+// it no longer overrides a field the user (or suggestMapping) has explicitly chosen.
+const NOTES_SOURCE_HEADERS = ['fleet evidence', 'operating indicator', 'outreach angle', 'source url', 'linkedin', 'research date'];
 
 async function preview(req, res) {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -140,8 +142,15 @@ function mapRow(row, mapping) {
   for (const [csvCol, field] of Object.entries(mapping)) {
     const value = row[csvCol];
     if (!field || value === undefined || value === null || value === '') continue;
-    if (field === 'notes' || NOTES_SOURCE_HEADERS.some(h => normalize(csvCol).includes(normalize(h)))) {
-      notesParts.push(field === 'notes' ? String(value) : `${csvCol}: ${value}`);
+    // Respect whatever field was actually selected for this column (either by the
+    // user, or by suggestMapping). Only columns explicitly mapped to "notes" get
+    // folded into the free-text notes field - a column mapped to a real field
+    // (e.g. Qualification Evidence -> Qualification evidence) is no longer
+    // silently redirected into Notes based on its header text.
+    if (field === 'notes') {
+      // don't prefix the genuine "Notes" column with its own header, but do label
+      // any other column the user deliberately chose to fold into notes
+      notesParts.push(normalize(csvCol) === 'notes' ? String(value) : `${csvCol}: ${value}`);
     } else if (KNOWN_FIELDS.includes(field)) {
       mapped[field] = value;
     }
@@ -172,14 +181,14 @@ function suggestMapping(headers) {
   const aliasGroups = {
     businessName: ['company', 'businessname', 'business', 'companyname'],
     industry: ['industry', 'sector', 'businesstype'],
-    website: ['website', 'url', 'web'],
+    website: ['website', 'url', 'web', 'websitepublicsource', 'publicsource'],
     decisionMaker: ['decisionmaker', 'contact', 'owner', 'manager'],
     decisionMakerPosition: ['title', 'position', 'decisionmakerposition', 'role'],
     phone: ['phone', 'telephone', 'mobile', 'contactnumber'],
-    email: ['email', 'emailaddress'],
+    email: ['email', 'emailaddress', 'decisionmakeremail'],
     vehicleCount: ['vehicles', 'vehiclecount', 'fleetsize', 'fleet', 'estimatedfleetrange'],
     location: ['location', 'address'],
-    city: ['city'],
+    city: ['city', 'cityarea'],
     county: ['county'],
     leadSource: ['leadid', 'leadsource', 'source', 'campaign'],
     currentArrangement: ['currentarrangement', 'currentprovider', 'currentservice'],
@@ -187,6 +196,8 @@ function suggestMapping(headers) {
     score: ['score', 'preliminaryscore', 'priorityscore'],
     status: ['status', 'outreachstatus'],
     nextAction: ['nextaction'],
+    qualificationEvidence: ['qualificationevidence', 'qualificationevid'],
+    verificationStatus: ['verificationstatus'],
     notes: ['notes', 'comments'],
     assignedCaller: ['assignedcaller', 'caller', 'assignedto']
   };

@@ -133,7 +133,11 @@ async function update(req, res) {
   });
 
   if (data.assignedCallerId && data.assignedCallerId !== existing.assignedCallerId) {
-    log(req.user.id, 'assigned_caller', 'prospect', prospect.id, data.assignedCallerId);
+    const [prevCaller, newCaller] = await Promise.all([
+      existing.assignedCallerId ? prisma.user.findUnique({ where: { id: existing.assignedCallerId }, select: { name: true } }) : null,
+      prisma.user.findUnique({ where: { id: data.assignedCallerId }, select: { name: true } })
+    ]);
+    log(req.user.id, 'assigned_caller', 'prospect', prospect.id, null, prevCaller?.name || 'Unassigned', newCaller?.name || data.assignedCallerId);
     notify(data.assignedCallerId, 'prospect_assigned', `${prospect.businessName} has been assigned to you`, prospect.id);
   }
   res.json(prospect);
@@ -153,6 +157,7 @@ async function overrideTier(req, res) {
       originalTier: existing.tier, newTier: tier, reason: reason || null, overriddenById: req.user.id
     }
   });
+  log(req.user.id, 'tier_override', 'prospect', prospect.id, reason || null, existing.tier, tier);
   res.json(prospect);
 }
 

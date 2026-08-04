@@ -22,11 +22,22 @@ async function create(req, res) {
 
 async function update(req, res) {
   const { name, role, phone, active, password } = req.body;
+  const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'User not found' });
+
   const data = { name, role, phone, active };
   Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
   if (password) data.password = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.update({ where: { id: req.params.id }, data });
+
+  if (role && role !== existing.role) {
+    log(req.user.id, 'role_changed', 'user', user.id, user.email, existing.role, role);
+  }
+  if (active !== undefined && active !== existing.active) {
+    log(req.user.id, active ? 'user_enabled' : 'user_disabled', 'user', user.id, user.email, String(existing.active), String(active));
+  }
+
   res.json({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active });
 }
 

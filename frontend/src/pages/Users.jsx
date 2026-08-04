@@ -7,6 +7,7 @@ import Input from '../components/common/Input.jsx';
 import Select from '../components/common/Select.jsx';
 import Modal from '../components/common/Modal.jsx';
 import { Loader } from '../components/common/Loader.jsx';
+import StatusModal from '../components/common/StatusModal.jsx';
 
 const ROLES = [
   { value: 'caller', label: 'Caller' },
@@ -26,6 +27,18 @@ export default function Users() {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
 
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusType, setStatusType] = useState('success');
+  const [statusTitle, setStatusTitle] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  function showStatus(t, title, message) {
+    setStatusType(t);
+    setStatusTitle(title);
+    setStatusMessage(message);
+    setStatusOpen(true);
+  }
+
   async function load() {
     const { data } = await api.get('/users');
     setItems(data);
@@ -34,15 +47,19 @@ export default function Users() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.post('/users', form);
-    setOpen(false);
-    setForm(EMPTY_CREATE);
-    load();
+    try {
+      await api.post('/users', form);
+      setOpen(false);
+      setForm(EMPTY_CREATE);
+      showStatus('success', 'User Created', 'The new user account has been created.');
+      load();
+    } catch (err) {
+      showStatus('error', 'Could Not Create User', err.response?.data?.error || 'Unable to create this user.');
+    }
   }
 
   function openEdit(user) {
     setEditId(user.id);
-
     setEditForm({
       name: user.name || '',
       email: user.email || '',
@@ -61,14 +78,24 @@ export default function Users() {
       role: editForm.role
     };
     if (editForm.password) payload.password = editForm.password;
-    await api.put(`/users/${editId}`, payload);
-    setEditId(null);
-    load();
+    try {
+      await api.put(`/users/${editId}`, payload);
+      setEditId(null);
+      showStatus('success', 'User Updated', 'Changes have been saved.');
+      load();
+    } catch (err) {
+      showStatus('error', 'Could Not Save Changes', err.response?.data?.error || 'Unable to update this user.');
+    }
   }
 
   async function toggleActive(u) {
-    await api.put(`/users/${u.id}`, { active: !u.active });
-    load();
+    try {
+      await api.put(`/users/${u.id}`, { active: !u.active });
+      showStatus('success', u.active ? 'User Disabled' : 'User Enabled', `${u.name} has been ${u.active ? 'disabled' : 'enabled'}.`);
+      load();
+    } catch (err) {
+      showStatus('error', 'Could Not Update Status', err.response?.data?.error || 'Unable to change this user\'s status.');
+    }
   }
 
   if (!items) return <Loader label="Loading users..." />;
@@ -117,6 +144,15 @@ export default function Users() {
           <Button type="submit" className="w-full">Save Changes</Button>
         </form>
       </Modal>
+
+      <StatusModal
+        open={statusOpen}
+        type={statusType}
+        title={statusTitle}
+        message={statusMessage}
+        buttonText="OK"
+        onClose={() => setStatusOpen(false)}
+      />
     </div>
   );
 }

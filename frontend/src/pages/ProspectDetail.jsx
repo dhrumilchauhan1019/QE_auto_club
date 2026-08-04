@@ -170,6 +170,8 @@ export default function ProspectDetail() {
               <Row label="Current arrangement" value={prospect.currentArrangement} />
               <Row label="Website" value={prospect.website} />
               <Row label="Lead source" value={prospect.leadSource} />
+              <Row label="Qualification evidence" value={prospect.qualificationEvidence} />
+              <Row label="Verification status" value={prospect.verificationStatus} />
             </dl>
           </Card>
 
