@@ -68,8 +68,6 @@ model Prospect {
   decisionMakerPosition String?
   phone               String?
   email               String?
-  qualificationEvidence String?
-  verificationStatus  String?
   vehicleCount        Int      @default(0)
   location            String?
   currentArrangement  String?

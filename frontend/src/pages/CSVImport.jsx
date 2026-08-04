@@ -27,8 +27,6 @@ const FIELDS = [
   { value: 'status', label: 'Status / stage' },
   { value: 'nextAction', label: 'Next action' },
   { value: 'assignedCaller', label: 'Assigned caller (by name)' },
-  { value: 'qualificationEvidence', label: 'Qualification evidence' },
-  { value: 'verificationStatus', label: 'Verification status' },
   { value: 'notes', label: 'Notes' }
 ];
 
