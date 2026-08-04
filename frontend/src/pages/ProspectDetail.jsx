@@ -168,8 +168,10 @@ export default function ProspectDetail() {
               <Row label="Vehicles" value={prospect.vehicleCount} />
               <Row label="Location" value={[prospect.location, prospect.city, prospect.state].filter(Boolean).join(', ')} />
               <Row label="Current arrangement" value={prospect.currentArrangement} />
-              <Row label="Website" value={prospect.website} />
+              <LinkRow label="Website" value={prospect.website} />
               <Row label="Lead source" value={prospect.leadSource} />
+              <LongRow label="Qualification evidence" value={prospect.qualificationEvidence} />
+              <LongRow label="Verification status" value={prospect.verificationStatus} />
             </dl>
           </Card>
 
@@ -259,5 +261,42 @@ export default function ProspectDetail() {
 }
 
 function Row({ label, value }) {
-  return <div className="flex justify-between"><dt className="text-slate">{label}</dt><dd className="text-mist">{value || '—'}</dd></div>;
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-slate shrink-0">{label}</dt>
+      <dd className="text-mist text-right break-words min-w-0">{value || '—'}</dd>
+    </div>
+  );
+}
+
+function LinkRow({ label, value }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-slate shrink-0">{label}</dt>
+      <dd className="text-mist text-right break-all min-w-0">
+        {value ? (
+          <a href={value} target="_blank" rel="noopener noreferrer" className="text-copper hover:underline">
+            {value}
+          </a>
+        ) : '—'}
+      </dd>
+    </div>
+  );
+}
+
+function LongRow({ label, value }) {
+  if (!value) {
+    return (
+      <div className="flex justify-between gap-3">
+        <dt className="text-slate shrink-0">{label}</dt>
+        <dd className="text-mist">—</dd>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <dt className="text-slate mb-1">{label}</dt>
+      <dd className="text-mist break-words leading-relaxed">{value}</dd>
+    </div>
+  );
 }
