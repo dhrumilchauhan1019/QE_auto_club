@@ -8,6 +8,7 @@ const app = express();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: false })); // needed for Twilio's form-encoded webhooks
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api', routes);
