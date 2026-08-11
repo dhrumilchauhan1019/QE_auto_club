@@ -1,6 +1,10 @@
 // sanitized-data AI helper, falls back to local heuristics with no API key set
 const prisma = require('../config/database');
 
+// Gemini model alias - Google keeps this pointed at their current recommended flash model,
+// so you shouldn't need to change it again when they deprecate a dated version.
+const GEMINI_MODEL = 'gemini-flash-latest';
+
 const PROMPTS = {
   call_summary: 'Summarize this prospect for a caller about to dial: likely objections and one talking point.',
   proposal_summary: 'Write a 3-sentence proposal cover summary for this fleet prospect.',
@@ -24,15 +28,36 @@ async function assist(req, res) {
     notes: prospect.activities.map(a => `${a.outcome}: ${a.notes || ''}`)
   };
 
+  const prompt = `Sanitized prospect data: ${JSON.stringify(sanitized)}. ${PROMPTS[type] || PROMPTS.call_summary} Draft only, under 80 words, for human review.`;
+
   let text, source = 'local_heuristic';
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 250 }
+          })
+        }
+      );
+      const data = await r.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'AI response unavailable.';
+      source = 'gemini_api';
+    } catch (e) {
+      text = fallback(type, sanitized);
+    }
+  } else if (process.env.ANTHROPIC_API_KEY) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6', max_tokens: 250,
-          messages: [{ role: 'user', content: `Sanitized prospect data: ${JSON.stringify(sanitized)}. ${PROMPTS[type] || PROMPTS.call_summary} Draft only, under 80 words, for human review.` }]
+          messages: [{ role: 'user', content: prompt }]
         })
       });
       const data = await r.json();

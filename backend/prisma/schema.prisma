@@ -51,6 +51,7 @@ model User {
   logs              ActivityLog[]
   csvImports        CsvImport[]
   overrides         ScoreHistory[]
+  calls             Call[]
 }
 
 model Prospect {
@@ -105,6 +106,27 @@ model Prospect {
   meetings      Meeting[]
   scoreHistory  ScoreHistory[]
   notifications Notification[]
+  calls         Call[]
+}
+
+model Call {
+  id           String    @id @default(uuid())
+  prospectId   String
+  prospect     Prospect  @relation(fields: [prospectId], references: [id])
+  callerId     String?
+  caller       User?     @relation(fields: [callerId], references: [id])
+  callSid      String?   @unique
+  toNumber     String
+  fromNumber   String?
+  direction    String    @default("outbound")
+  status       String    @default("initiated") // initiated, ringing, in-progress, completed, busy, failed, no-answer, canceled
+  duration     Int?
+  recordingSid String?
+  recordingUrl String?
+  transcript   String?
+  summary      String?
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
 }
 
 model Activity {

@@ -14,6 +14,7 @@ router.use('/meetings', require('./meeting.routes'));
 router.use('/notifications', require('./notification.routes'));
 router.use('/activity-logs', require('./activitylog.routes'));
 router.use('/settings', require('./settings.routes'));
+router.use('/twilio', require('./twilio.routes'));
 router.use('/', require('./misc.routes'));
 
 module.exports = router;

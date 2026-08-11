@@ -7,6 +7,7 @@ import Input from '../components/common/Input.jsx';
 import { Loader, TierBadge } from '../components/common/Loader.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import StatusModal from '../components/common/StatusModal.jsx';
+import { useTwilioDevice } from '../hooks/useTwilioDevice.js';
 
 const OUTCOMES = [
   ['no_answer', 'No answer'], ['voicemail_left', 'Voicemail left'], ['gatekeeper_reached', 'Gatekeeper reached'],
@@ -23,6 +24,15 @@ const CLOSING_OUTCOMES = ['not_interested', 'existing_provider', 'internal_autom
 const REQUIRES_DATE = ['no_answer', 'call_back_later', 'decision_maker_unavailable', 'presentation_scheduled'];
 const REQUIRES_NOTES = ['not_interested', 'disqualified', 'duplicate', 'insufficient_fleet', 'internal_automotive_department'];
 
+const DIALER_LABEL = {
+  'connecting-device': 'Starting dialer…',
+  offline: 'Dialer offline',
+  ready: 'Ready to call',
+  connecting: 'Calling…',
+  'in-progress': 'On call',
+  error: 'Dialer error',
+};
+
 export default function CallerWorkspace() {
   const { user } = useAuth();
   const [current, setCurrent] = useState(null);
@@ -36,6 +46,12 @@ export default function CallerWorkspace() {
   const [nextActionNote, setNextActionNote] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  // --- Twilio dialer state -------------------------------------------------
+  const dialer = useTwilioDevice();
+  const [lastCallId, setLastCallId] = useState(null); // our DB Call.id, once we can look it up by CallSid
+  const [summary, setSummary] = useState('');
+  const [summarizing, setSummarizing] = useState(false);
 
   const callerParam = { callerId: user.role === 'caller' ? user.id : undefined };
   const needsDate = REQUIRES_DATE.includes(outcome);
@@ -62,6 +78,7 @@ export default function CallerWorkspace() {
   async function loadNext(prospectId) {
     setLoading(true);
     setMessage(''); setError('');
+    setSummary(''); setLastCallId(null);
     const { data } = await api.get('/caller/next', { params: { ...callerParam, prospectId } });
     setCurrent(data.prospect);
     setScript(data.openingScript || '');
@@ -69,6 +86,42 @@ export default function CallerWorkspace() {
   }
 
   useEffect(() => { loadNext(); loadQueue(); }, []);
+
+  // Once a call ends, look up the Call record we created for it (by CallSid) so we can
+  // request an AI summary and store it against the right row.
+  useEffect(() => {
+    async function fetchCallRecord() {
+      if (dialer.status !== 'ready' || !dialer.callSid) return;
+      try {
+        const { data } = await api.get(`/twilio/calls/by-sid/${dialer.callSid}`);
+        setLastCallId(data.id);
+      } catch {
+        // recording/status webhooks may not have landed yet - that's fine, summary button just won't show
+      }
+    }
+    fetchCallRecord();
+  }, [dialer.status, dialer.callSid]);
+
+  function startCall() {
+    if (!current?.phone) {
+      showStatus('error', 'No phone number', 'This prospect has no phone number on file.');
+      return;
+    }
+    dialer.call({ to: current.phone, prospectId: current.id, callerId: user.id });
+  }
+
+  async function generateSummary() {
+    if (!lastCallId) return;
+    setSummarizing(true);
+    try {
+      const { data } = await api.post(`/twilio/calls/${lastCallId}/summary`, { notes });
+      setSummary(data.summary);
+    } catch (err) {
+      showStatus('error', 'Summary failed', err.response?.data?.error || 'Could not generate a call summary.');
+    } finally {
+      setSummarizing(false);
+    }
+  }
 
   async function submitCall(e) {
     e.preventDefault();
@@ -92,6 +145,8 @@ export default function CallerWorkspace() {
       setNextActionNote("");
       setDmReached(false);
       setOutcome("decision_maker_reached");
+      setSummary("");
+      setLastCallId(null);
 
       setMessage("Call logged.");
 
@@ -167,6 +222,45 @@ export default function CallerWorkspace() {
                   <div className="mt-4 bg-ink rounded-lg p-4">
                     <p className="text-copper text-xs uppercase tracking-wide mb-1">Approved opening</p>
                     <p className="text-mist text-sm italic">{script}</p>
+                  </div>
+
+                  {/* --- Dialer --- */}
+                  <div className="mt-4 bg-ink rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-copper text-xs uppercase tracking-wide">Dialer</p>
+                      <span className={`text-xs ${dialer.status === 'error' ? 'text-red-400' : 'text-slate'}`}>
+                        {DIALER_LABEL[dialer.status] || dialer.status}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {dialer.status === 'in-progress' || dialer.status === 'connecting' ? (
+                        <>
+                          <Button type="button" onClick={dialer.hangup} className="flex-1 !bg-red-500 hover:!bg-red-600">Hang up</Button>
+                          <Button type="button" onClick={dialer.toggleMute} className="!bg-steelLight">
+                            {dialer.muted ? 'Unmute' : 'Mute'}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={startCall}
+                          disabled={dialer.status !== 'ready' || !current.phone}
+                          className="flex-1"
+                        >
+                          Call {current.phone || 'prospect'}
+                        </Button>
+                      )}
+                    </div>
+                    {dialer.error && <p className="text-red-400 text-xs">{dialer.error}</p>}
+
+                    {dialer.status === 'ready' && lastCallId && (
+                      <div className="pt-2 border-t border-border/50 space-y-2">
+                        <Button type="button" onClick={generateSummary} disabled={summarizing} className="w-full !bg-steelLight">
+                          {summarizing ? 'Generating summary…' : 'Generate AI call summary'}
+                        </Button>
+                        {summary && <p className="text-mist text-xs whitespace-pre-line">{summary}</p>}
+                      </div>
+                    )}
                   </div>
                 </Card>
 
