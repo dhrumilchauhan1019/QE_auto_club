@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Device, Call } from '@twilio/voice-sdk';
+import { Device } from '@twilio/voice-sdk';
 import api from '../api/axios';
 
 // Wraps the Twilio Voice SDK so any page can do click-to-call with a couple of function calls.
@@ -11,7 +11,6 @@ export function useTwilioDevice() {
   const [error, setError] = useState('');
   const [callSid, setCallSid] = useState(null);
   const [muted, setMuted] = useState(false);
-  const [qualityWarning, setQualityWarning] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,16 +20,11 @@ export function useTwilioDevice() {
         const { data } = await api.get('/twilio/token');
         if (cancelled) return;
 
-        // Fix for the agent (browser) leg sounding weaker/dropping out vs the PSTN leg:
-        // - Opus has built-in packet-loss concealment/FEC; PCMU (what the PSTN leg already
-        //   uses) does not, so the browser<->Twilio leg is far more sensitive to the
-        //   public-internet packet loss that a phone-network leg never sees.
-        // - forceAggressiveIceNomination works around a known Chrome WebRTC bug where audio
-        //   quality degrades / drops out over the course of a call due to ICE re-nomination.
         const device = new Device(data.token, {
           logLevel: 'error',
-          codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
-          forceAggressiveIceNomination: true,
+          // Opus gives noticeably better voice quality than the default PCMU, which matters a
+          // lot for downstream transcription accuracy - especially over spotty mobile networks.
+          codecPreferences: ['opus', 'pcmu'],
         });
         device.on('registered', () => setStatus('ready'));
         device.on('unregistered', () => setStatus('offline'));
@@ -38,6 +32,22 @@ export function useTwilioDevice() {
           setError(e.message || 'Dialer error');
           setStatus('error');
         });
+
+        // Force echo cancellation / noise suppression / auto gain ON regardless of the browser's
+        // or OS's default. This matters most when using a phone/PC speaker instead of a headset:
+        // without echo cancellation, the mic picks up your own voice coming back out of the
+        // speaker, which both muddies the recording and confuses call transcription (it can start
+        // to look like a third "phantom" speaker). setAudioConstraints must be called before
+        // setInputDevice/register for it to apply to the very first call.
+        try {
+          await device.audio.setAudioConstraints({
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          });
+        } catch (e) {
+          console.warn('Could not set audio constraints', e);
+        }
 
         await device.register();
         deviceRef.current = device;
@@ -69,24 +79,12 @@ export function useTwilioDevice() {
     conn.on('disconnect', () => {
       setStatus('ready');
       setMuted(false);
-      setQualityWarning(null);
     });
     conn.on('cancel', () => setStatus('ready'));
     conn.on('reject', () => setStatus('ready'));
     conn.on('error', (e) => {
       setError(e.message || 'Call error');
       setStatus('ready');
-    });
-    // Twilio raises these when the browser<->Twilio leg (i.e. the agent's own audio,
-    // not the prospect's) is seeing packet loss / jitter / low MOS in real time.
-    // Logged for now — surface `qualityWarning` in the UI if you want the agent to see it live.
-    conn.on('warning', (name) => {
-      console.warn('[call quality]', name);
-      setQualityWarning(name);
-    });
-    conn.on('warning-cleared', (name) => {
-      console.info('[call quality cleared]', name);
-      setQualityWarning((prev) => (prev === name ? null : prev));
     });
   }, []);
 
@@ -100,5 +98,5 @@ export function useTwilioDevice() {
     setMuted(next);
   }, [muted]);
 
-  return { status, error, callSid, muted, qualityWarning, call, hangup, toggleMute };
+  return { status, error, callSid, muted, call, hangup, toggleMute };
 }
