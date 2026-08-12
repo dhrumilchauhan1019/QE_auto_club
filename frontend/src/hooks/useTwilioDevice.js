@@ -20,13 +20,34 @@ export function useTwilioDevice() {
         const { data } = await api.get('/twilio/token');
         if (cancelled) return;
 
-        const device = new Device(data.token, { logLevel: 'error' });
+        const device = new Device(data.token, {
+          logLevel: 'error',
+          // Opus gives noticeably better voice quality than the default PCMU, which matters a
+          // lot for downstream transcription accuracy - especially over spotty mobile networks.
+          codecPreferences: ['opus', 'pcmu'],
+        });
         device.on('registered', () => setStatus('ready'));
         device.on('unregistered', () => setStatus('offline'));
         device.on('error', (e) => {
           setError(e.message || 'Dialer error');
           setStatus('error');
         });
+
+        // Force echo cancellation / noise suppression / auto gain ON regardless of the browser's
+        // or OS's default. This matters most when using a phone/PC speaker instead of a headset:
+        // without echo cancellation, the mic picks up your own voice coming back out of the
+        // speaker, which both muddies the recording and confuses call transcription (it can start
+        // to look like a third "phantom" speaker). setAudioConstraints must be called before
+        // setInputDevice/register for it to apply to the very first call.
+        try {
+          await device.audio.setAudioConstraints({
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          });
+        } catch (e) {
+          console.warn('Could not set audio constraints', e);
+        }
 
         await device.register();
         deviceRef.current = device;
