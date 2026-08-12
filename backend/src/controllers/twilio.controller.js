@@ -172,7 +172,7 @@ async function transcribeRecording(callSid, mp3Url) {
           contents: [
             {
               parts: [
-                { text: 'Transcribe this sales call recording. The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages). Translate everything into English - do not leave any non-English words or sentences in the output. Label speaker turns as "Caller:" and "Prospect:" where you can tell them apart. Output must be plain text, English only.' },
+                { text: 'Transcribe this sales call recording between two people talking on a phone call - it will have two distinct voices/channels, one for each side of the call. You must include BOTH sides of the conversation, turn by turn, in the order they spoke - never omit or skip a speaker\'s turns even if the audio is quiet or unclear for one side. Label the person who initiated the call and is selling/pitching as "Caller:" and the person being called as "Prospect:". If you genuinely cannot tell who is speaking for a turn, still include it and label it "Speaker:" rather than dropping it. The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages) - translate everything into English, do not leave any non-English words or sentences in the output. Output must be plain text, English only, with each turn on its own line.' },
                 { inline_data: { mime_type: 'audio/mp3', data: audioBase64 } },
               ],
             },
@@ -259,7 +259,19 @@ async function summarize(req, res) {
     ? `Call transcript:\n${call.transcript}`
     : `Caller notes: ${notes || '(none provided)'}\nCall duration: ${call.duration || 0}s. Status: ${call.status}.`;
 
-  const prompt = `You are summarizing a B2B sales call for "${call.prospect.businessName}". ${basis}\nWrite a 3-4 sentence summary covering: what was discussed, the prospect's reaction, and the recommended next step. The call may have included Hindi, Gujarati, English, or a mix - regardless of what language was used, your entire summary must be written in clear, professional English only. Do not include any non-English words. Plain text only, no headers.`;
+  const prompt = `You are summarizing a B2B sales call for "${call.prospect.businessName}" (${call.prospect.industry || 'unknown industry'}, ${call.prospect.vehicleCount || 0} vehicles).
+${basis}
+
+The call may have included Hindi, Gujarati, English, or a mix - regardless of what language was used, your entire response must be written in clear, professional English only. Do not include any non-English words.
+
+Write the summary in EXACTLY this format (plain text, no markdown symbols, keep it concise):
+
+Call Summary
+<2-3 sentences: what was discussed, what the prospect currently does/uses if mentioned, and the prospect's reaction/interest level>
+
+Outcome: <one short phrase, e.g. Interested / Not interested / No answer / Follow-up requested / Needs approval from someone else>
+Key Need: <the prospect's main pain point or need mentioned on the call, or "Not discussed" if none came up>
+Next Action: <the concrete next step, e.g. "Send pricing info and schedule follow-up call" or "No further action - not interested">`;
 
   let summary = null;
   if (process.env.GEMINI_API_KEY) {
@@ -271,7 +283,7 @@ async function summarize(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 220 },
+            generationConfig: { maxOutputTokens: 400 },
           }),
         }
       );
