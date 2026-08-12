@@ -4,16 +4,14 @@ const prisma = require('../config/database');
 
 const {
   TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN,
   TWILIO_API_KEY_SID,
   TWILIO_API_KEY_SECRET,
   TWILIO_TWIML_APP_SID,
   TWILIO_PHONE_NUMBER,
   PUBLIC_BASE_URL, // e.g. https://your-backend.onrender.com  (must be publicly reachable by Twilio)
+  GEMINI_API_KEY,
 } = process.env;
-
-// Gemini model alias - Google keeps this pointed at their current recommended flash model,
-// so you shouldn't need to change it again when they deprecate a dated version.
-const GEMINI_MODEL = 'gemini-flash-latest';
 
 const AccessToken = twilio.jwt.AccessToken;
 const VoiceGrant = AccessToken.VoiceGrant;
@@ -127,10 +125,55 @@ async function status(req, res) {
   res.sendStatus(200);
 }
 
+// Downloads the recording from Twilio (requires Basic Auth) and transcribes it with Gemini,
+// then saves the result onto the Call row. Twilio's recording media isn't ready to download
+// the instant the callback fires, so this is best-effort and never blocks the webhook response.
+async function transcribeRecording(callSid, mp3Url) {
+  if (!GEMINI_API_KEY || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) return;
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+    const audioRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+    if (!audioRes.ok) throw new Error(`recording download failed: ${audioRes.status}`);
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    const audioBase64 = audioBuffer.toString('base64');
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: 'Transcribe this sales call recording. The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages). Translate everything into English - do not leave any non-English words or sentences in the output. Label speaker turns as "Caller:" and "Prospect:" where you can tell them apart. Output must be plain text, English only.' },
+                { inline_data: { mime_type: 'audio/mp3', data: audioBase64 } },
+              ],
+            },
+          ],
+          generationConfig: { maxOutputTokens: 2048 },
+        }),
+      }
+    );
+    const data = await r.json();
+    const transcript = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (transcript) {
+      await prisma.call.updateMany({ where: { callSid }, data: { transcript } });
+    } else {
+      console.error('twilio.transcribeRecording: no transcript in Gemini response', JSON.stringify(data).slice(0, 500));
+    }
+  } catch (e) {
+    console.error('twilio.transcribeRecording error', e.message);
+  }
+}
+
 // POST /api/twilio/recording-status
-// Fires once the call recording is ready. Stores the recording URL on the Call record.
+// Fires once the call recording is ready. Stores the recording URL on the Call record and
+// kicks off transcription in the background (not awaited - don't hold up Twilio's webhook).
 async function recordingStatus(req, res) {
   const { CallSid, RecordingSid, RecordingUrl, RecordingDuration } = req.body;
+  const mp3Url = RecordingUrl ? `${RecordingUrl}.mp3` : undefined;
 
   if (CallSid) {
     await prisma.call
@@ -138,11 +181,13 @@ async function recordingStatus(req, res) {
         where: { callSid: CallSid },
         data: {
           recordingSid: RecordingSid,
-          recordingUrl: RecordingUrl ? `${RecordingUrl}.mp3` : undefined,
+          recordingUrl: mp3Url,
           duration: RecordingDuration ? parseInt(RecordingDuration, 10) : undefined,
         },
       })
       .catch((e) => console.error('twilio.recordingStatus error', e.message));
+
+    if (mp3Url) transcribeRecording(CallSid, mp3Url); // fire and forget
   }
 
   res.sendStatus(200);
@@ -178,13 +223,13 @@ async function summarize(req, res) {
     ? `Call transcript:\n${call.transcript}`
     : `Caller notes: ${notes || '(none provided)'}\nCall duration: ${call.duration || 0}s. Status: ${call.status}.`;
 
-  const prompt = `You are summarizing a B2B sales call for "${call.prospect.businessName}". ${basis}\nWrite a 3-4 sentence summary covering: what was discussed, the prospect's reaction, and the recommended next step. Plain text only, no headers.`;
+  const prompt = `You are summarizing a B2B sales call for "${call.prospect.businessName}". ${basis}\nWrite a 3-4 sentence summary covering: what was discussed, the prospect's reaction, and the recommended next step. The call may have included Hindi, Gujarati, English, or a mix - regardless of what language was used, your entire summary must be written in clear, professional English only. Do not include any non-English words. Plain text only, no headers.`;
 
   let summary = null;
   if (process.env.GEMINI_API_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
