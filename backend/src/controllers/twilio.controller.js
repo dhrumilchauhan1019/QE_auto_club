@@ -135,17 +135,22 @@ async function transcribeRecording(callSid, mp3Url) {
     return;
   }
 
+  // Use the .wav version for transcription - it's Twilio's higher-fidelity, less-compressed
+  // format (the .mp3 stored on the Call row is just for in-app playback). Less compression
+  // artifacts means fewer misheard words for Gemini to "fill in" with plausible-sounding guesses.
+  const wavUrl = mp3Url.replace(/\.mp3$/, '.wav');
+
   const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
   let audioBuffer = null;
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
-      const audioRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+      const audioRes = await fetch(wavUrl, { headers: { Authorization: authHeader } });
       if (audioRes.ok) {
         audioBuffer = Buffer.from(await audioRes.arrayBuffer());
         break;
       }
-      console.error(`twilio.transcribeRecording: download attempt ${attempt} got HTTP ${audioRes.status} for ${mp3Url}`);
+      console.error(`twilio.transcribeRecording: download attempt ${attempt} got HTTP ${audioRes.status} for ${wavUrl}`);
     } catch (e) {
       console.error(`twilio.transcribeRecording: download attempt ${attempt} threw`, e.message);
     }
@@ -153,11 +158,11 @@ async function transcribeRecording(callSid, mp3Url) {
   }
 
   if (!audioBuffer) {
-    console.error('twilio.transcribeRecording: giving up, could not download recording after 4 attempts', mp3Url);
+    console.error('twilio.transcribeRecording: giving up, could not download recording after 4 attempts', wavUrl);
     return;
   }
-  if (audioBuffer.length < 2000) {
-    console.error(`twilio.transcribeRecording: recording is only ${audioBuffer.length} bytes - likely silent/near-empty audio, skipping transcription`, mp3Url);
+  if (audioBuffer.length < 4000) {
+    console.error(`twilio.transcribeRecording: recording is only ${audioBuffer.length} bytes - likely silent/near-empty audio, skipping transcription`, wavUrl);
     return;
   }
 
@@ -172,8 +177,15 @@ async function transcribeRecording(callSid, mp3Url) {
           contents: [
             {
               parts: [
-                { text: 'Transcribe this sales call recording between two people talking on a phone call - it will have two distinct voices/channels, one for each side of the call. You must include BOTH sides of the conversation, turn by turn, in the order they spoke - never omit or skip a speaker\'s turns even if the audio is quiet or unclear for one side. Label the person who initiated the call and is selling/pitching as "Caller:" and the person being called as "Prospect:". If you genuinely cannot tell who is speaking for a turn, still include it and label it "Speaker:" rather than dropping it. The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages) - translate everything into English, do not leave any non-English words or sentences in the output. Output must be plain text, English only, with each turn on its own line.' },
-                { inline_data: { mime_type: 'audio/mp3', data: audioBase64 } },
+                {
+                  text:
+                    'You are a literal, word-for-word transcription engine, not a conversational assistant. Transcribe EXACTLY what is spoken in this two-person phone call - do not paraphrase, do not summarize, do not invent plausible-sounding dialogue, and do not "clean up" or replace unclear words with words that would make more sense in context. ' +
+                    'If a word or phrase is genuinely inaudible or unclear, write "[inaudible]" at that spot instead of guessing a replacement - inventing text is far worse than admitting you could not hear it. ' +
+                    'Include BOTH sides of the conversation, turn by turn, in the order they spoke - never omit or skip a speaker\'s turns even if their audio is quieter. Label the person who initiated the call and is selling/pitching as "Caller:" and the person being called as "Prospect:". If you truly cannot tell who is speaking for a turn, still include it, labeled "Speaker:". ' +
+                    'The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages) - transcribe what was literally said, then translate it into English (do not leave non-English words in the output). ' +
+                    'Output must be plain text, English only, one turn per line.',
+                },
+                { inline_data: { mime_type: 'audio/wav', data: audioBase64 } },
               ],
             },
           ],
