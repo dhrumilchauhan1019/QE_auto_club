@@ -126,20 +126,45 @@ async function status(req, res) {
 }
 
 // Downloads the recording from Twilio (requires Basic Auth) and transcribes it with Gemini,
-// then saves the result onto the Call row. Twilio's recording media isn't ready to download
-// the instant the callback fires, so this is best-effort and never blocks the webhook response.
+// then saves the result onto the Call row. Twilio's recording media isn't always ready to
+// download the instant the callback fires, so this retries a few times, and logs every
+// failure reason to Render logs so problems are visible instead of silently swallowed.
 async function transcribeRecording(callSid, mp3Url) {
-  if (!GEMINI_API_KEY || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) return;
+  if (!GEMINI_API_KEY || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+    console.error('twilio.transcribeRecording: skipped, missing GEMINI_API_KEY / TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN env var');
+    return;
+  }
+
+  const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+
+  let audioBuffer = null;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const audioRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+      if (audioRes.ok) {
+        audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+        break;
+      }
+      console.error(`twilio.transcribeRecording: download attempt ${attempt} got HTTP ${audioRes.status} for ${mp3Url}`);
+    } catch (e) {
+      console.error(`twilio.transcribeRecording: download attempt ${attempt} threw`, e.message);
+    }
+    await new Promise((r) => setTimeout(r, 3000)); // recording may not be encoded yet - wait and retry
+  }
+
+  if (!audioBuffer) {
+    console.error('twilio.transcribeRecording: giving up, could not download recording after 4 attempts', mp3Url);
+    return;
+  }
+  if (audioBuffer.length < 2000) {
+    console.error(`twilio.transcribeRecording: recording is only ${audioBuffer.length} bytes - likely silent/near-empty audio, skipping transcription`, mp3Url);
+    return;
+  }
 
   try {
-    const authHeader = 'Basic ' + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-    const audioRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
-    if (!audioRes.ok) throw new Error(`recording download failed: ${audioRes.status}`);
-    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
     const audioBase64 = audioBuffer.toString('base64');
-
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,17 +181,28 @@ async function transcribeRecording(callSid, mp3Url) {
         }),
       }
     );
+    if (!r.ok) {
+      console.error(`twilio.transcribeRecording: Gemini HTTP ${r.status}`, (await r.text()).slice(0, 500));
+      return;
+    }
     const data = await r.json();
     const transcript = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (transcript) {
       await prisma.call.updateMany({ where: { callSid }, data: { transcript } });
+      console.log(`twilio.transcribeRecording: saved transcript (${transcript.length} chars) for ${callSid}`);
     } else {
-      console.error('twilio.transcribeRecording: no transcript in Gemini response', JSON.stringify(data).slice(0, 500));
+      console.error(
+        'twilio.transcribeRecording: no transcript text in Gemini response - finishReason:',
+        data.candidates?.[0]?.finishReason,
+        'blockReason:', data.promptFeedback?.blockReason,
+        JSON.stringify(data).slice(0, 500)
+      );
     }
   } catch (e) {
-    console.error('twilio.transcribeRecording error', e.message);
+    console.error('twilio.transcribeRecording: Gemini call threw', e.message);
   }
 }
+
 
 // POST /api/twilio/recording-status
 // Fires once the call recording is ready. Stores the recording URL on the Call record and
@@ -229,7 +265,7 @@ async function summarize(req, res) {
   if (process.env.GEMINI_API_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

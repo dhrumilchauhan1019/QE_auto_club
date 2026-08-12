@@ -1,10 +1,6 @@
 // sanitized-data AI helper, falls back to local heuristics with no API key set
 const prisma = require('../config/database');
 
-// Gemini model alias - Google keeps this pointed at their current recommended flash model,
-// so you shouldn't need to change it again when they deprecate a dated version.
-const GEMINI_MODEL = 'gemini-flash-latest';
-
 const PROMPTS = {
   call_summary: 'Summarize this prospect for a caller about to dial: likely objections and one talking point.',
   proposal_summary: 'Write a 3-sentence proposal cover summary for this fleet prospect.',
@@ -34,7 +30,7 @@ async function assist(req, res) {
   if (process.env.GEMINI_API_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
