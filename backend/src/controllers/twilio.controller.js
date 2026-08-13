@@ -16,6 +16,30 @@ const {
 const AccessToken = twilio.jwt.AccessToken;
 const VoiceGrant = AccessToken.VoiceGrant;
 
+// Calls Gemini's generateContent endpoint. On a 429 (rate limit - common on the free tier,
+// which allows only ~20 requests/minute), waits for the time Google tells us to and retries
+// once automatically instead of just failing, so a burst of test calls self-heals.
+async function callGemini(model, body) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.status === 429 && attempt === 1) {
+      const text = await r.text();
+      const match = text.match(/retry in ([\d.]+)s/i);
+      const waitMs = match ? Math.ceil(parseFloat(match[1]) * 1000) + 1000 : 15000;
+      console.error(`Gemini rate limited (429), waiting ${waitMs}ms and retrying once...`);
+      await new Promise((res) => setTimeout(res, waitMs));
+      continue;
+    }
+    return r;
+  }
+  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+
 // GET /api/twilio/token
 // The logged-in caller's browser calls this to get a short-lived token for the Twilio Voice SDK.
 async function token(req, res) {
@@ -168,31 +192,24 @@ async function transcribeRecording(callSid, mp3Url) {
 
   try {
     const audioBase64 = audioBuffer.toString('base64');
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
+    const r = await callGemini('gemini-3.5-flash', {
+      contents: [
+        {
+          parts: [
             {
-              parts: [
-                {
-                  text:
-                    'You are a literal, word-for-word transcription engine, not a conversational assistant. Transcribe as accurately as possible what is spoken in this two-person phone call - do not summarize, and never invent a full sentence or plausible-sounding dialogue that was not actually said. ' +
-                    'Use context and normal listening effort the way a human transcriber would: minor unclear words (fillers, connectors, a word or two here and there) can be your best-guess based on context - that is normal transcription, not invention. Only use "[inaudible]" for a stretch of speech that is genuinely impossible to make out at all (e.g. overlapping speech, dead air, heavy noise) - do not overuse it for every slightly unclear word, and never mark an entire sentence "[inaudible]" if most of it is understandable. ' +
-                    'Include BOTH sides of the conversation, turn by turn, in the order they spoke - never omit or skip a speaker\'s turns even if their audio is quieter. Label the person who initiated the call and is selling/pitching as "Caller:" and the person being called as "Prospect:". Only use the generic label "Speaker:" if you truly cannot tell which of the two people it is - most turns should be labeled Caller or Prospect. ' +
-                    'The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages) - transcribe what was literally said, then translate it into English (do not leave non-English words in the output). ' +
-                    'Output must be plain text, English only, one turn per line.',
-                },
-                { inline_data: { mime_type: 'audio/wav', data: audioBase64 } },
-              ],
+              text:
+                'You are a literal, word-for-word transcription engine, not a conversational assistant. Transcribe as accurately as possible what is spoken in this two-person phone call - do not summarize, and never invent a full sentence or plausible-sounding dialogue that was not actually said. ' +
+                'Use context and normal listening effort the way a human transcriber would: minor unclear words (fillers, connectors, a word or two here and there) can be your best-guess based on context - that is normal transcription, not invention. Only use "[inaudible]" for a stretch of speech that is genuinely impossible to make out at all (e.g. overlapping speech, dead air, heavy noise) - do not overuse it for every slightly unclear word, and never mark an entire sentence "[inaudible]" if most of it is understandable. ' +
+                'Include BOTH sides of the conversation, turn by turn, in the order they spoke - never omit or skip a speaker\'s turns even if their audio is quieter. Label the person who initiated the call and is selling/pitching as "Caller:" and the person being called as "Prospect:". Only use the generic label "Speaker:" if you truly cannot tell which of the two people it is - most turns should be labeled Caller or Prospect. ' +
+                'The speakers may talk in English, Hindi, Gujarati, or a mix of these (or other languages) - transcribe what was literally said, then translate it into English (do not leave non-English words in the output). ' +
+                'Output must be plain text, English only, one turn per line.',
             },
+            { inline_data: { mime_type: 'audio/wav', data: audioBase64 } },
           ],
-          generationConfig: { maxOutputTokens: 2048 },
-        }),
-      }
-    );
+        },
+      ],
+      generationConfig: { maxOutputTokens: 2048 },
+    });
     if (!r.ok) {
       console.error(`twilio.transcribeRecording: Gemini HTTP ${r.status}`, (await r.text()).slice(0, 500));
       return;
@@ -299,17 +316,10 @@ Next Action: <the concrete next step, e.g. "Send pricing info and schedule follo
   let summary = null;
   if (process.env.GEMINI_API_KEY) {
     try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 400 },
-          }),
-        }
-      );
+      const r = await callGemini('gemini-3.5-flash', {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 400 },
+      });
       const data = await r.json();
       summary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
     } catch (e) {

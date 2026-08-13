@@ -33,20 +33,23 @@ export function useTwilioDevice() {
           setStatus('error');
         });
 
-        // Force echo cancellation / noise suppression / auto gain ON regardless of the browser's
-        // or OS's default. This matters most when using a phone/PC speaker instead of a headset:
-        // without echo cancellation, the mic picks up your own voice coming back out of the
-        // speaker, which both muddies the recording and confuses call transcription (it can start
-        // to look like a third "phantom" speaker). setAudioConstraints must be called before
-        // setInputDevice/register for it to apply to the very first call.
+        // Explicitly request the microphone BEFORE registering, so we get a real,
+        // user-visible error if permission is denied or no mic is available - instead of
+        // silently proceeding with a broken/empty audio track (which is what happened
+        // before: the browser sent silence and the prospect couldn't hear the agent at all).
+        // NOTE: we intentionally do NOT call device.audio.setAudioConstraints() here anymore -
+        // it caused a regression where the mic stream was captured but carried no real audio
+        // on some devices/browsers. Chrome/most browsers already default getUserMedia() to
+        // echoCancellation, noiseSuppression and autoGainControl all being ON, so we get most
+        // of the same benefit without the custom override that broke things.
         try {
-          await device.audio.setAudioConstraints({
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          });
-        } catch (e) {
-          console.warn('Could not set audio constraints', e);
+          const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          testStream.getTracks().forEach((t) => t.stop()); // just testing access, release it
+        } catch (micErr) {
+          console.error('Microphone permission/access failed', micErr);
+          setError('Microphone access was blocked or unavailable. Click the padlock/site info icon in your browser address bar, allow microphone access for this site, then reload the page.');
+          setStatus('error');
+          return;
         }
 
         await device.register();
