@@ -71,6 +71,24 @@ export default function ProspectDetail() {
   async function getAiHelp(type) {
     setAiType(type);
     setAiLoading(true);
+    if (type === 'call_summary') {
+      // Pull the REAL, transcript-based summary from the most recent call (the one generated
+      // in twilio.controller.js from what was actually said) instead of the generic AI-assist
+      // endpoint, which doesn't know anything about the actual call content.
+      try {
+        const { data: calls } = await api.get(`/twilio/calls/${id}`);
+        const latestWithSummary = calls.find((c) => c.summary);
+        setAi(
+          latestWithSummary
+            ? { text: latestWithSummary.summary, disclosure: `From the call on ${new Date(latestWithSummary.startedAt).toLocaleString()} - AI-generated from the call recording, requires human review.` }
+            : { text: 'No call summary yet - make a call to this prospect first, then generate a summary from the call screen.', disclosure: '' }
+        );
+      } catch (e) {
+        setAi({ text: 'Could not load the call summary.', disclosure: '' });
+      }
+      setAiLoading(false);
+      return;
+    }
     const { data } = await api.get(`/ai/assist/${id}`, { params: { type } });
     setAi(data);
     setAiLoading(false);
@@ -206,7 +224,7 @@ export default function ProspectDetail() {
             {aiLoading && <Loader label="Thinking..." />}
             {ai && !aiLoading && (
               <div className="space-y-2">
-                <p className="text-sm text-mist">{ai.text}</p>
+                <p className="text-sm text-mist whitespace-pre-line">{ai.text}</p>
                 <p className="text-xs text-copper">{ai.disclosure}</p>
               </div>
             )}
