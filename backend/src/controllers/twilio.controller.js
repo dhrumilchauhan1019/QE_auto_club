@@ -203,6 +203,14 @@ async function transcribeRecording(callSid, mp3Url) {
       await prisma.call.updateMany({ where: { callSid }, data: { transcript } });
       console.log(`twilio.transcribeRecording: saved transcript (${transcript.length} chars) for ${callSid}`);
     } else {
+      // Gemini returned an empty result - almost always means the audio was too quiet/distant
+      // to make out any real speech, not a bug in this code. Save a placeholder so the UI shows
+      // *why* there's no transcript instead of silently staying blank, and so summarize() has
+      // something honest to say instead of falling back to a generic "no notes" message.
+      await prisma.call.updateMany({
+        where: { callSid },
+        data: { transcript: '(Recording was too quiet or unclear to transcribe - no speech could be reliably made out.)' },
+      }).catch(() => {});
       console.error(
         'twilio.transcribeRecording: no transcript text in Gemini response - finishReason:',
         data.candidates?.[0]?.finishReason,
@@ -267,9 +275,12 @@ async function summarize(req, res) {
   if (!call) return res.status(404).json({ error: 'Call not found' });
 
   const { notes } = req.body;
-  const basis = call.transcript
+  const hasUsableTranscript = call.transcript && !call.transcript.startsWith('(Recording was too quiet');
+  const basis = hasUsableTranscript
     ? `Call transcript:\n${call.transcript}`
-    : `Caller notes: ${notes || '(none provided)'}\nCall duration: ${call.duration || 0}s. Status: ${call.status}.`;
+    : `Caller notes: ${notes || '(none provided)'}\nCall duration: ${call.duration || 0}s. Status: ${call.status}.${
+        call.transcript ? ' Note: the call recording was too quiet/unclear to transcribe automatically.' : ''
+      }`;
 
   const prompt = `You are summarizing a B2B sales call for "${call.prospect.businessName}" (${call.prospect.industry || 'unknown industry'}, ${call.prospect.vehicleCount || 0} vehicles).
 ${basis}
