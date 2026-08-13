@@ -2,6 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Device } from '@twilio/voice-sdk';
 import api from '../api/axios';
 
+// Error codes that mean "the underlying connection/session went stale" (e.g. phone/PC was
+// asleep and the WebSocket to Twilio died in the background) rather than something the user
+// needs to act on. These get silently recovered from instead of shown as a red alert.
+const STALE_SESSION_CODES = new Set([20101, 20104, 31005, 31009]);
+
 // Wraps the Twilio Voice SDK so any page can do click-to-call with a couple of function calls.
 // status: 'offline' | 'connecting-device' | 'ready' | 'connecting' | 'in-progress' | 'error'
 export function useTwilioDevice() {
@@ -28,7 +33,26 @@ export function useTwilioDevice() {
         });
         device.on('registered', () => setStatus('ready'));
         device.on('unregistered', () => setStatus('offline'));
+        device.on('tokenWillExpire', async () => {
+          // Fires ~30s before the token expires - fetch a fresh one and hand it to the Device
+          // so it never actually goes stale. This is what stops the red AccessTokenInvalid
+          // error from appearing when the portal is left open/idle for a while.
+          try {
+            const { data } = await api.get('/twilio/token');
+            device.updateToken(data.token);
+          } catch (e) {
+            console.error('Could not refresh Twilio token', e);
+          }
+        });
         device.on('error', (e) => {
+          // 20101/20104 = invalid/expired token, 31005/31009 = dead WebSocket/transport
+          // (typically from the phone/PC sleeping). None of these are user-actionable, so
+          // instead of a scary red alert, quietly rebuild the whole device connection.
+          if (STALE_SESSION_CODES.has(e.code)) {
+            console.warn('Stale Twilio session detected, reconnecting silently...', e.code, e.message);
+            reconnectDevice();
+            return;
+          }
           setError(e.message || 'Dialer error');
           setStatus('error');
         });
@@ -60,9 +84,32 @@ export function useTwilioDevice() {
       }
     }
 
+    // Fully tears down and rebuilds the Device with a fresh token + fresh WebSocket. Used both
+    // when a stale-session error is caught, and proactively when the tab/phone wakes up from
+    // sleep, so the connection is already healthy before you even try to make a call.
+    async function reconnectDevice() {
+      try {
+        deviceRef.current?.destroy();
+      } catch {}
+      deviceRef.current = null;
+      await setup();
+    }
+
     setup();
+
+    // Rebuild the connection when the tab becomes visible again (phone screen turned back on,
+    // PC woken from sleep, or switching back from another app/tab) - this is what stops the
+    // red error from ever appearing, instead of just reacting to it after a failed call.
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && deviceRef.current) {
+        reconnectDevice();
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       deviceRef.current?.destroy();
     };
   }, []);
@@ -82,10 +129,25 @@ export function useTwilioDevice() {
     conn.on('disconnect', () => {
       setStatus('ready');
       setMuted(false);
+      setError(''); // clear any lingering error banner (e.g. ConnectionError) once the call is over
     });
-    conn.on('cancel', () => setStatus('ready'));
-    conn.on('reject', () => setStatus('ready'));
+    conn.on('cancel', () => {
+      setStatus('ready');
+      setError('');
+    });
+    conn.on('reject', () => {
+      setStatus('ready');
+      setError('');
+    });
     conn.on('error', (e) => {
+      if (STALE_SESSION_CODES.has(e.code)) {
+        // Same stale-session case, just happened mid-call-attempt - no red alert, just reset
+        // quietly so the next call attempt starts clean (the visibilitychange/error handlers
+        // above will already be rebuilding the device in the background).
+        console.warn('Stale session during call, resetting silently...', e.code, e.message);
+        setStatus('ready');
+        return;
+      }
       setError(e.message || 'Call error');
       setStatus('ready');
     });
