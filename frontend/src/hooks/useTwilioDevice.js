@@ -28,28 +28,7 @@ export function useTwilioDevice() {
         });
         device.on('registered', () => setStatus('ready'));
         device.on('unregistered', () => setStatus('offline'));
-        device.on('tokenWillExpire', async () => {
-          // Fires ~30s before the token expires - fetch a fresh one and hand it to the Device
-          // so it never actually goes stale. This is what stops the red AccessTokenInvalid
-          // error from appearing when the portal is left open/idle for a while.
-          try {
-            const { data } = await api.get('/twilio/token');
-            device.updateToken(data.token);
-          } catch (e) {
-            console.error('Could not refresh Twilio token', e);
-          }
-        });
         device.on('error', (e) => {
-          // 20101/20104 = invalid/expired access token. Rather than showing a scary red error
-          // for something the user can't act on, try one silent token refresh first and only
-          // surface an error if that refresh itself fails.
-          if (e.code === 20101 || e.code === 20104) {
-            api
-              .get('/twilio/token')
-              .then(({ data }) => device.updateToken(data.token))
-              .catch(() => setError('Session expired - please reload the page.'));
-            return;
-          }
           setError(e.message || 'Dialer error');
           setStatus('error');
         });
@@ -103,16 +82,9 @@ export function useTwilioDevice() {
     conn.on('disconnect', () => {
       setStatus('ready');
       setMuted(false);
-      setError(''); // clear any lingering error banner (e.g. ConnectionError) once the call is over
     });
-    conn.on('cancel', () => {
-      setStatus('ready');
-      setError('');
-    });
-    conn.on('reject', () => {
-      setStatus('ready');
-      setError('');
-    });
+    conn.on('cancel', () => setStatus('ready'));
+    conn.on('reject', () => setStatus('ready'));
     conn.on('error', (e) => {
       setError(e.message || 'Call error');
       setStatus('ready');
