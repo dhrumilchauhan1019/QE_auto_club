@@ -91,9 +91,10 @@ async function getOne(req, res) {
     }
   });
   if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
-  if (req.user.role === 'caller' && prospect.assignedCallerId !== req.user.id) {
-    return res.status(403).json({ error: 'Not assigned to you' });
-  }
+  // NOTE: previously blocked callers from viewing prospects not assigned to them (403).
+  // Removed per request - any authenticated user (any role, any assignment) can now view
+  // any prospect's detail page, including its latest call summary, so the whole team sees
+  // the same data instead of only the assigned caller.
   if (req.user.role === 'closer' && prospect.assignedCloserId !== req.user.id) {
     const isClaimable = !prospect.assignedCloserId && CLOSER_VISIBLE_STAGES.includes(prospect.status);
     if (!isClaimable) return res.status(403).json({ error: 'Not assigned to you' });
