@@ -17,6 +17,7 @@ export default function ProspectDetail() {
   const [prospect, setProspect] = useState(null);
   const [ai, setAi] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiType, setAiType] = useState('call_summary');
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [meetingForm, setMeetingForm] = useState({ scheduledAt: '', type: 'presentation' });
 
@@ -37,6 +38,9 @@ export default function ProspectDetail() {
     setProspect(data);
   }
   useEffect(() => { load(); }, [id]);
+  // Auto-load the Call Summary tab so the AI Assistant panel isn't blank by default -
+  // it now shows something useful the moment the page opens, same as clicking the button.
+  useEffect(() => { getAiHelp('call_summary'); }, [id]);
 
   async function handleOverride(e) {
     try {
@@ -65,6 +69,7 @@ export default function ProspectDetail() {
   }
 
   async function getAiHelp(type) {
+    setAiType(type);
     setAiLoading(true);
     const { data } = await api.get(`/ai/assist/${id}`, { params: { type } });
     setAi(data);
@@ -189,7 +194,13 @@ export default function ProspectDetail() {
           <Card title="AI Assistant" className="col-span-1">
             <div className="flex flex-wrap gap-1 mb-3">
               {[['call_summary', 'Call Summary'], ['next_action', 'Next Action'], ['followup_suggestion', 'Follow-up']].map(([t, l]) => (
-                <button key={t} onClick={() => getAiHelp(t)} className="text-xs px-2 py-1 rounded bg-steelLight text-slate hover:text-copper">{l}</button>
+                <button
+                  key={t}
+                  onClick={() => getAiHelp(t)}
+                  className={`text-xs px-2 py-1 rounded ${aiType === t ? 'bg-copper text-charcoal' : 'bg-steelLight text-slate hover:text-copper'}`}
+                >
+                  {l}
+                </button>
               ))}
             </div>
             {aiLoading && <Loader label="Thinking..." />}
