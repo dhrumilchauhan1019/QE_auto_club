@@ -4,6 +4,7 @@ import api from '../api/axios';
 import Card from '../components/common/Card.jsx';
 import Table from '../components/common/Table.jsx';
 import Input from '../components/common/Input.jsx';
+import PhoneInput from '../components/common/PhoneInput.jsx';
 import Select from '../components/common/Select.jsx';
 import Button from '../components/common/Button.jsx';
 import { Loader, TierBadge, StatusPill } from '../components/common/Loader.jsx';
@@ -295,7 +296,7 @@ export default function Prospects() {
               <Input label="Position" value={form.decisionMakerPosition} onChange={e => setForm({ ...form, decisionMakerPosition: e.target.value })} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              <PhoneInput label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
               <Input label="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -320,7 +321,7 @@ export default function Prospects() {
               <Input label="Position" value={editForm.decisionMakerPosition} onChange={e => setEditForm({ ...editForm, decisionMakerPosition: e.target.value })} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Phone" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+              <PhoneInput label="Phone" value={editForm.phone} onChange={(v) => setEditForm({ ...editForm, phone: v })} />
               <Input label="Email" type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

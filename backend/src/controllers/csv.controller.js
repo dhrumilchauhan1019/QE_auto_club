@@ -53,16 +53,23 @@ async function importRows(req, res) {
   if (!Array.isArray(rows) || !mapping) return res.status(400).json({ error: 'rows and mapping are required' });
 
   const [existing, callers] = await Promise.all([
-    prisma.prospect.findMany({ select: { email: true, phone: true, businessName: true } }),
+    prisma.prospect.findMany({ select: { id: true, email: true, phone: true, businessName: true, leadSource: true } }),
     prisma.user.findMany({ where: { role: { in: ['caller', 'closer'] } }, select: { id: true, name: true } })
   ]);
   const existingEmails = new Set(existing.map(p => (p.email || '').toLowerCase()).filter(Boolean));
   const existingPhones = new Set(existing.map(p => p.phone).filter(Boolean));
+  // Lead ID (leadSource) is the one column that reliably identifies "the same lead" across
+  // re-imports of an edited/corrected spreadsheet, even if phone/email were blank or wrong the
+  // first time around. Without this, re-importing a corrected CSV created duplicate rows instead
+  // of updating the existing one.
+  const existingByLeadSource = new Map(existing.filter(p => p.leadSource).map(p => [p.leadSource, p]));
   const callerByName = new Map(callers.map(c => [c.name.toLowerCase(), c.id]));
   const seenInBatch = new Set();
+  const seenLeadSourcesInBatch = new Set();
 
-  const results = { success: 0, failed: 0, duplicates: 0, errors: [] };
+  const results = { success: 0, updated: 0, failed: 0, duplicates: 0, errors: [] };
   const toCreate = [];
+  const toUpdate = [];
 
   rows.forEach((row, index) => {
     const mapped = mapRow(row, mapping);
@@ -83,17 +90,6 @@ async function importRows(req, res) {
     mapped.phone = mapped.phone ? normalizePhone(mapped.phone) : null;
     mapped.vehicleCount = parseVehicleCount(mapped.vehicleCount);
 
-    const emailKey = (mapped.email || '').toLowerCase();
-    const dupKey = emailKey || mapped.phone || mapped.businessName.toLowerCase();
-    const isDup = (emailKey && existingEmails.has(emailKey)) || (mapped.phone && existingPhones.has(mapped.phone)) || seenInBatch.has(dupKey);
-
-    if (isDup) {
-      results.duplicates++;
-      results.errors.push({ row: index + 1, data: row, errors: ['Duplicate record'] });
-      return;
-    }
-    seenInBatch.add(dupKey);
-
     const assignedCallerId = mapped.assignedCaller ? callerByName.get(String(mapped.assignedCaller).toLowerCase()) : undefined;
     delete mapped.assignedCaller;
 
@@ -111,12 +107,39 @@ async function importRows(req, res) {
     if (mapped.status) status = STATUS_ALIASES[String(mapped.status).toLowerCase().trim()] || 'lead';
     delete mapped.status;
 
+    // Same Lead ID as an existing prospect (from this import or an earlier one) -> update that
+    // row in place instead of creating a duplicate.
+    const existingMatch = mapped.leadSource && !seenLeadSourcesInBatch.has(mapped.leadSource)
+      ? existingByLeadSource.get(mapped.leadSource)
+      : null;
+    if (mapped.leadSource) seenLeadSourcesInBatch.add(mapped.leadSource);
+
+    if (existingMatch) {
+      toUpdate.push({ id: existingMatch.id, data: { ...mapped, score, tier, scoreReason: reason, status, assignedCallerId } });
+      return;
+    }
+
+    const emailKey = (mapped.email || '').toLowerCase();
+    const dupKey = emailKey || mapped.phone || mapped.businessName.toLowerCase();
+    const isDup = (emailKey && existingEmails.has(emailKey)) || (mapped.phone && existingPhones.has(mapped.phone)) || seenInBatch.has(dupKey);
+
+    if (isDup) {
+      results.duplicates++;
+      results.errors.push({ row: index + 1, data: row, errors: ['Duplicate record'] });
+      return;
+    }
+    seenInBatch.add(dupKey);
+
     toCreate.push({ ...mapped, score, tier, scoreReason: reason, status, assignedCallerId });
   });
 
   if (toCreate.length > 0) {
     await prisma.prospect.createMany({ data: toCreate });
     results.success = toCreate.length;
+  }
+  if (toUpdate.length > 0) {
+    await Promise.all(toUpdate.map(({ id, data }) => prisma.prospect.update({ where: { id }, data }).catch(() => null)));
+    results.updated = toUpdate.length;
   }
 
   await prisma.csvImport.create({
@@ -176,7 +199,7 @@ function suggestMapping(headers) {
     decisionMaker: ['decisionmaker', 'contact', 'owner', 'manager'],
     decisionMakerPosition: ['title', 'position', 'decisionmakerposition', 'role'],
     phone: ['phone', 'telephone', 'mobile', 'contactnumber'],
-    email: ['email', 'emailaddress'],
+    email: ['email', 'emailaddress', 'decisionmakeremail'],
     vehicleCount: ['vehicles', 'vehiclecount', 'fleetsize', 'fleet', 'estimatedfleetrange'],
     location: ['location', 'address'],
     city: ['city', 'cityarea'],
@@ -187,7 +210,7 @@ function suggestMapping(headers) {
     score: ['score', 'preliminaryscore', 'priorityscore'],
     status: ['status', 'outreachstatus'],
     nextAction: ['nextaction'],
-    notes: ['notes', 'comments', 'verificationstatus', 'qualificationevidence', 'decisionmakeremail', 'testdata'],
+    notes: ['notes', 'comments', 'verificationstatus', 'qualificationevidence', 'testdata'],
     assignedCaller: ['assignedcaller', 'caller', 'assignedto']
   };
 

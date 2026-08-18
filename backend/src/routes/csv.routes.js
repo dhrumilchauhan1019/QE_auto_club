@@ -4,7 +4,7 @@ const upload = require('../config/multer');
 const { requireAuth } = require('../middlewares/auth.middleware');
 const { requireRole } = require('../middlewares/role.middleware');
 
-router.use(requireAuth, requireRole('admin', 'manager'));
+router.use(requireAuth, requireRole('admin', 'manager', 'caller'));
 router.post('/preview', upload.single('file'), ctrl.preview);
 router.post('/import', ctrl.importRows);
 router.get('/history', ctrl.history);

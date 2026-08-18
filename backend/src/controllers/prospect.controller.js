@@ -108,6 +108,9 @@ async function getOne(req, res) {
 
 async function create(req, res) {
   const data = sanitizeInput(req.body, { isCreate: true });
+  // Callers only ever see prospects assigned to them (see scopeWhere below) - without this,
+  // a caller creating a new prospect wouldn't be able to find it again in their own list.
+  if (req.user.role === 'caller' && !data.assignedCallerId) data.assignedCallerId = req.user.id;
   const { score, tier, reason } = calculateScore(data);
   const prospect = await prisma.prospect.create({ data: { ...data, score, tier, scoreReason: reason } });
   log(req.user.id, 'created', 'prospect', prospect.id, prospect.businessName);
@@ -169,6 +172,11 @@ async function archive(req, res) {
 }
 
 async function remove(req, res) {
+  const existing = await prisma.prospect.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Prospect not found' });
+  if (req.user.role === 'caller' && existing.assignedCallerId !== req.user.id) {
+    return res.status(403).json({ error: 'Not assigned to you' });
+  }
   await prisma.prospect.delete({ where: { id: req.params.id } });
   log(req.user.id, 'deleted', 'prospect', req.params.id, null);
   res.status(204).send();
