@@ -8,7 +8,7 @@ const REQUIRED_FIELDS = ['businessName'];
 const KNOWN_FIELDS = [
   'businessName', 'industry', 'website', 'decisionMaker', 'decisionMakerPosition', 'phone', 'email',
   'vehicleCount', 'location', 'city', 'county', 'currentArrangement', 'leadSource', 'tier', 'score',
-  'status', 'nextAction', 'notes', 'assignedCaller'
+  'status', 'nextAction', 'notes', 'assignedCaller', 'qualificationEvidence', 'verificationStatus'
 ];
 
 const STATUS_ALIASES = {
@@ -163,11 +163,11 @@ function mapRow(row, mapping) {
   for (const [csvCol, field] of Object.entries(mapping)) {
     const value = row[csvCol];
     if (!field || value === undefined || value === null || value === '') continue;
-    if (field === 'notes' || NOTES_SOURCE_HEADERS.some(h => normalize(csvCol).includes(normalize(h)))) {
-      // Always keep the original column name as a label, UNLESS the column is genuinely just
-      // called "Notes" - otherwise folding several different columns (Fleet Evidence,
-      // Verification Status, Research Date, etc.) together produces an unlabeled, unreadable
-      // wall of text that looks like duplicated/garbled content.
+    // Trust whatever field the dropdown actually selected - don't re-guess based on the
+    // column's header text. Previously, a column like "Verification Status" would get folded
+    // into notes AS WELL AS its explicitly chosen field, because the header-text heuristic
+    // (meant only for *suggesting* a default mapping) was also re-applied here at import time.
+    if (field === 'notes') {
       const isActuallyCalledNotes = normalize(csvCol) === 'notes';
       notesParts.push(isActuallyCalledNotes ? String(value) : `${csvCol}: ${value}`);
     } else if (KNOWN_FIELDS.includes(field)) {
@@ -215,7 +215,9 @@ function suggestMapping(headers) {
     score: ['score', 'preliminaryscore', 'priorityscore'],
     status: ['status', 'outreachstatus'],
     nextAction: ['nextaction'],
-    notes: ['notes', 'comments', 'verificationstatus', 'qualificationevidence', 'testdata'],
+    notes: ['notes', 'comments', 'testdata'],
+    qualificationEvidence: ['qualificationevidence', 'fleetevidence', 'fleetevidenceoperatingindicator'],
+    verificationStatus: ['verificationstatus'],
     assignedCaller: ['assignedcaller', 'caller', 'assignedto']
   };
 

@@ -72,6 +72,8 @@ model Prospect {
   vehicleCount        Int      @default(0)
   location            String?
   currentArrangement  String?
+  qualificationEvidence String?
+  verificationStatus  String?
   tier                String   @default("C")
   score               Int      @default(0)
   scoreReason         String?
