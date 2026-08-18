@@ -34,7 +34,7 @@ export default function App() {
       <Route path="/" element={<Shell><Dashboard /></Shell>} />
       <Route path="/prospects" element={<Shell><Prospects /></Shell>} />
       <Route path="/prospects/:id" element={<Shell><ProspectDetail /></Shell>} />
-      <Route path="/csv-import" element={<Shell roles={['admin', 'manager']}><CSVImport /></Shell>} />
+      <Route path="/csv-import" element={<Shell roles={['admin', 'manager', 'caller']}><CSVImport /></Shell>} />
       <Route path="/caller" element={<Shell><CallerWorkspace /></Shell>} />
       <Route path="/followups" element={<Shell><Followups /></Shell>} />
       <Route path="/pipeline" element={<Shell><Pipeline /></Shell>} />

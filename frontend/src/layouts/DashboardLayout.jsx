@@ -7,7 +7,7 @@ const ALL = ['admin', 'executive', 'manager', 'closer', 'finance', 'caller'];
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '◧', roles: ALL },
   { to: '/prospects', label: 'Prospects', icon: '☰', roles: ALL },
-  { to: '/csv-import', label: 'Import CSV', icon: '⇩', roles: ['admin', 'manager'] },
+  { to: '/csv-import', label: 'Import CSV', icon: '⇩', roles: ['admin', 'manager', 'caller'] },
   { to: '/caller', label: 'Call Queue', icon: '☎', roles: ['admin', 'manager', 'caller'] },
   { to: '/followups', label: 'Follow-ups', icon: '⏱', roles: ['admin', 'manager', 'caller', 'closer'] },
   { to: '/pipeline', label: 'Pipeline', icon: '⚏', roles: ALL },

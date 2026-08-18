@@ -164,7 +164,12 @@ function mapRow(row, mapping) {
     const value = row[csvCol];
     if (!field || value === undefined || value === null || value === '') continue;
     if (field === 'notes' || NOTES_SOURCE_HEADERS.some(h => normalize(csvCol).includes(normalize(h)))) {
-      notesParts.push(field === 'notes' ? String(value) : `${csvCol}: ${value}`);
+      // Always keep the original column name as a label, UNLESS the column is genuinely just
+      // called "Notes" - otherwise folding several different columns (Fleet Evidence,
+      // Verification Status, Research Date, etc.) together produces an unlabeled, unreadable
+      // wall of text that looks like duplicated/garbled content.
+      const isActuallyCalledNotes = normalize(csvCol) === 'notes';
+      notesParts.push(isActuallyCalledNotes ? String(value) : `${csvCol}: ${value}`);
     } else if (KNOWN_FIELDS.includes(field)) {
       mapped[field] = value;
     }

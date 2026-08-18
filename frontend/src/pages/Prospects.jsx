@@ -224,8 +224,8 @@ export default function Prospects() {
     a.href = url; a.download = 'prospects_export.csv'; a.click();
   }
 
-  const canEdit = user.role === 'admin' || user.role === 'manager';
-  const canDelete = user.role === 'admin';
+  const canEdit = user.role === 'admin' || user.role === 'manager' || user.role === 'caller';
+  const canDelete = user.role === 'admin' || user.role === 'caller';
   const canAssign = user.role === 'admin' || user.role === 'manager';
 
   const columns = [
