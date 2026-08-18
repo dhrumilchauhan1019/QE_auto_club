@@ -27,6 +27,12 @@ const FIELDS = [
   { value: 'status', label: 'Status / stage' },
   { value: 'nextAction', label: 'Next action' },
   { value: 'assignedCaller', label: 'Assigned caller (by name)' },
+  { value: 'qualificationEvidence', label: 'Qualification evidence' },
+  { value: 'verificationStatus', label: 'Verification status' },
+  { value: 'recommendedOutreachAngle', label: 'Recommended outreach angle' },
+  { value: 'primarySourceUrl', label: 'Primary source URL' },
+  { value: 'researchDate', label: 'Research date' },
+  { value: 'linkedinUrl', label: 'LinkedIn URL' },
   { value: 'notes', label: 'Notes' }
 ];
 

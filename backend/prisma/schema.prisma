@@ -74,6 +74,10 @@ model Prospect {
   currentArrangement  String?
   qualificationEvidence String?
   verificationStatus  String?
+  recommendedOutreachAngle String?
+  primarySourceUrl    String?
+  researchDate        String?
+  linkedinUrl         String?
   tier                String   @default("C")
   score               Int      @default(0)
   scoreReason         String?

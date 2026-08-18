@@ -8,7 +8,8 @@ const REQUIRED_FIELDS = ['businessName'];
 const KNOWN_FIELDS = [
   'businessName', 'industry', 'website', 'decisionMaker', 'decisionMakerPosition', 'phone', 'email',
   'vehicleCount', 'location', 'city', 'county', 'currentArrangement', 'leadSource', 'tier', 'score',
-  'status', 'nextAction', 'notes', 'assignedCaller', 'qualificationEvidence', 'verificationStatus'
+  'status', 'nextAction', 'notes', 'assignedCaller', 'qualificationEvidence', 'verificationStatus',
+  'recommendedOutreachAngle', 'primarySourceUrl', 'researchDate', 'linkedinUrl'
 ];
 
 const STATUS_ALIASES = {
@@ -218,6 +219,10 @@ function suggestMapping(headers) {
     notes: ['notes', 'comments', 'testdata'],
     qualificationEvidence: ['qualificationevidence', 'fleetevidence', 'fleetevidenceoperatingindicator'],
     verificationStatus: ['verificationstatus'],
+    recommendedOutreachAngle: ['recommendedoutreachangle', 'outreachangle'],
+    primarySourceUrl: ['primarysourceurl', 'sourceurl'],
+    researchDate: ['researchdate'],
+    linkedinUrl: ['linkedinurl', 'linkedin'],
     assignedCaller: ['assignedcaller', 'caller', 'assignedto']
   };
 
