@@ -125,7 +125,11 @@ export default function Prospects() {
 
     try {
 
-      await api.put(`/prospects/${editId}`, editForm);
+      const { data: updated } = await api.put(`/prospects/${editId}`, editForm);
+
+      // Patch the row in place immediately with what the server just confirmed was saved -
+      // don't rely solely on the follow-up load() below in case of any caching in between.
+      setItems((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
 
       setEditId(null);
 

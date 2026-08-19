@@ -61,6 +61,15 @@ export default function CSVImport() {
   async function handleUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
+    uploadFile(file);
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showStatus?.('error', 'Wrong file type', 'Please drop a .csv file.');
+      return;
+    }
     setLoading(true);
     setResult(null);
     const formData = new FormData();
@@ -69,6 +78,28 @@ export default function CSVImport() {
     setPreview(data);
     setMapping(data.suggestedMapping);
     setLoading(false);
+  }
+
+  const [dragActive, setDragActive] = useState(false);
+
+  function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    uploadFile(file);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
   }
 
   async function handleImport() {
@@ -115,8 +146,13 @@ export default function CSVImport() {
 
         {!preview && (
           <Card>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-steelLight rounded-lg py-16 cursor-pointer hover:border-copper/50 transition-colors">
-              <span className="text-mist text-sm mb-1">Click to select a .csv file</span>
+            <label
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg py-16 cursor-pointer transition-colors ${dragActive ? 'border-copper bg-copper/5' : 'border-steelLight hover:border-copper/50'}`}
+            >
+              <span className="text-mist text-sm mb-1">{dragActive ? 'Drop your .csv file here' : 'Click or drag a .csv file here'}</span>
               <span className="text-slate text-xs">Column mapping and duplicate detection run automatically</span>
               <input type="file" accept=".csv" className="hidden" onChange={handleUpload} />
             </label>
