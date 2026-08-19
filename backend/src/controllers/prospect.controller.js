@@ -1,6 +1,6 @@
 const prisma = require('../config/database');
 const { calculateScore } = require('../utils/scoring');
-const { isValidEmail, normalizePhone } = require('../utils/validators');
+const { isValidEmail, isValidPhone, normalizePhone } = require('../utils/validators');
 const { log, notify } = require('../utils/log');
 
 // stages a closer would reasonably be working once a caller has qualified the lead -
@@ -107,6 +107,9 @@ async function getOne(req, res) {
 }
 
 async function create(req, res) {
+  if (req.body.phone && !isValidPhone(req.body.phone)) {
+    return res.status(400).json({ error: `"${req.body.phone}" doesn't look like a valid phone number. Include the country code (e.g. +1 for US, +91 for India) if it's not a US number.` });
+  }
   const data = sanitizeInput(req.body, { isCreate: true });
   // Callers only ever see prospects assigned to them (see scopeWhere below) - without this,
   // a caller creating a new prospect wouldn't be able to find it again in their own list.
@@ -118,6 +121,12 @@ async function create(req, res) {
 }
 
 async function update(req, res) {
+  // Previously an invalid phone number was silently normalized to an empty string and saved,
+  // WIPING out whatever phone number was already there with no warning at all. Now it's
+  // rejected up front with a clear error, so a bad edit never destroys existing good data.
+  if (req.body.phone && !isValidPhone(req.body.phone)) {
+    return res.status(400).json({ error: `"${req.body.phone}" doesn't look like a valid phone number. Include the country code (e.g. +1 for US, +91 for India) if it's not a US number.` });
+  }
   const data = sanitizeInput(req.body);
   const existing = await prisma.prospect.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: 'Prospect not found' });
